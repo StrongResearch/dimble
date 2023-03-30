@@ -2,6 +2,25 @@
 
 Nimble Digital Imaging for Medicine
 
+Near lossless and easy conversion from DICOM and back
+- Done
+
+Support for fast and random access of metadata
+- Done
+
+Extremely fast and zero-copy loading to CPU/GPU
+- Done
+
+All relevant data types including uint16, f16, bf16, complex64 and complex128
+- Currently supports f32, trivial to support other datatypes
+
+Bindings for Python and conversion to NumPy/CuPy/JAX/Torch tensors
+- Currently supports loading to Torch tensors (easily extensible)
+
+Safe: no codegen/exec based on the metadata
+- Done
+
+
 ## Installation
 
 ```sh
