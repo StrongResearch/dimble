@@ -24,8 +24,11 @@ import dimble
 # convert to dimble
 dimble.dicom_to_dimble('xray.dicom', 'xray.dimble')
 
-# load a dimble file
+# load a dimble file's pixel data
 dataset = dimble.load_dimble('xray.dimble', fields=["7FE00010"], device="cpu")
+
+# load a dimble file's pixel data sliced to a 224x224 chunk offset by 100 in each dimension
+dataset = dimble.load_dimble('xray.dimble', fields=["7FE00010"], device="cpu", slices=[slice(100:100+224), slice(100:100+224)])
 
 # convert back to dicom
 dimble.dimble_to_dicom("xray.dimble", "xray.dicom")
