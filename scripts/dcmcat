@@ -1,0 +1,16 @@
+#!/usr/bin/env python3
+from pathlib import Path
+
+import plac
+import pydicom
+
+
+@plac.annotations(
+    dicom_path=("Path to DICOM file", "positional", None, Path),
+)
+def main(dicom_path: Path):
+    ds = pydicom.dcmread(dicom_path)
+    print(ds)
+
+if __name__ == "__main__":
+    plac.call(main)

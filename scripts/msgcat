@@ -1,0 +1,23 @@
+#!/usr/bin/env python
+
+from pathlib import Path
+
+import msgpack
+import plac
+
+
+@plac.annotations(
+    path=("Path to the file", "positional", None, Path),
+    length_delimited=("Whether the file is length delimited", "flag", "l", bool),
+)
+def main(path: Path, length_delimited: bool = False):
+    with open(path, "rb") as f:
+        if length_delimited:
+            header_len = int.from_bytes(f.read(8), "little")
+        else:
+            header_len = None
+        data = msgpack.unpackb(f.read(header_len), raw=False)
+    print(data)
+
+if __name__ == "__main__":
+    plac.call(main)

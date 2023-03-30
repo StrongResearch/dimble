@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -e
+
+./scripts/dcmcat $1 > /tmp/1
+./scripts/dcmcat $2 > /tmp/2
+vimdiff /tmp/1 /tmp/2
