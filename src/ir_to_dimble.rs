@@ -102,12 +102,9 @@ fn get_field_bytes(
             vr: _string,
             inline_binary: Some(inline_binary),
         } => match tag {
-            "7FE00010" =>
-            {
-                get_file_bytes(
-                    pixel_array_safetensors_path.expect("expected pixel_array_safetensors_path"),
-                )
-            }
+            "7FE00010" => get_file_bytes(
+                pixel_array_safetensors_path.expect("expected pixel_array_safetensors_path"),
+            ),
             _ => to_vec(&inline_binary).unwrap(),
         },
         DicomField {

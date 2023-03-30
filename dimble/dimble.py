@@ -7,6 +7,7 @@ from safetensors.numpy import save_file
 
 from dimble_rs import dimble_rs
 
+
 def _dicom_to_ir(dicom_path: Path, output_name: str) -> dict[str, Path]:
     ds = pydicom.dcmread(dicom_path)
     output_json = Path(output_name + ".json")
@@ -23,8 +24,10 @@ def _dicom_to_ir(dicom_path: Path, output_name: str) -> dict[str, Path]:
 def _ir_to_dimble(json_path: Path, pixel_path: Path, output_path: Path) -> None:
     dimble_rs.dicom_json_to_dimble(str(json_path), str(output_path), str(pixel_path))
 
+
 def _dimble_to_ir(dimble_path: Path, output_path: Path) -> None:
     dimble_rs.dimble_to_dicom_json(str(dimble_path), str(output_path))
+
 
 def dicom_to_dimble(dicom_path: Path, output_path: Path) -> None:
     dicom_path = Path(dicom_path)
@@ -38,6 +41,7 @@ def dicom_to_dimble(dicom_path: Path, output_path: Path) -> None:
 
 def load_dimble(path: Path, fields: list[str], device="cpu", slices=None):
     return dimble_rs.load_dimble(str(path), fields, device, slices)
+
 
 def dimble_to_dicom(dimble_path: Path, output_path: Path) -> None:
     dimble_path = Path(dimble_path)

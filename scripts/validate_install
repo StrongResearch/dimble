@@ -3,9 +3,11 @@
 import os
 from pathlib import Path
 
-import torch
-import dimble
 import pydicom
+import torch
+
+import dimble
+
 
 def main():
     path = "https://github.com/pydicom/pydicom-data/blob/master/data_store/data/JPEG-LL.dcm?raw=true"

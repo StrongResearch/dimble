@@ -12,7 +12,6 @@ if __name__ == "__main__":
         {"mymeta": "hello from metadata"},
     )
 
-
     os.system("rm testfiles/eye3.safetensors_cat3x")
     os.system("touch testfiles/eye3.safetensors_cat3x")
     os.system("cat testfiles/eye3.safetensors >> testfiles/eye3.safetensors_cat3x")

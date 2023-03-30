@@ -263,8 +263,8 @@ fn dimble_rs(_py: Python, m: &PyModule) -> PyResult<()> {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
     use super::*;
+    use std::fs;
 
     #[test]
     fn test_load_pixel_array_safetensors() {

@@ -14,7 +14,7 @@ setup(
         "pydicom",
         "plac",
         "msgpack",
-        "python-gdcm"
+        "python-gdcm",
     ],
     extras_require={"dev": ["black", "flake8", "isort", "pytest"]},
     tests_require=["pytest"],
