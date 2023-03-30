@@ -46,12 +46,19 @@ def load_dimble(path: Path, fields: list[str], device="cpu", slices=None):
 def dimble_to_dicom(dimble_path: Path, output_path: Path) -> None:
     dimble_path = Path(dimble_path)
     ir_path = Path("/tmp") / (dimble_path.stem + ".ir.json")
+    dimble_ds = load_dimble(dimble_path, ["7FE00010"])
+
+    pixel_data = dimble_ds["7FE00010"].numpy()
+    from pydicom.uid import RLELossless
+
     try:
         _dimble_to_ir(dimble_path, ir_path)
         with open(ir_path) as f:
-            ds = pydicom.Dataset.from_json(f.read())
-        ds.is_little_endian = True
-        ds.is_implicit_VR = True
+            ds: pydicom.Dataset = pydicom.Dataset.from_json(f.read())
+        # TODO this code makes lots of unvalidated assumptions that should not be made.
+        ds.BitsAllocated = 16
+        ds.PixelRepresentation = 0
+        ds.compress(RLELossless, pixel_data.astype(np.uint16))
         ds.save_as(output_path, write_like_original=False)
     finally:
         ir_path.unlink(missing_ok=True)
