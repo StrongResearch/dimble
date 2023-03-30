@@ -1,5 +1,11 @@
 install:
-	pip install .[dev]
+	pip install -e .
+
+install-dev:
+	pip install -e .[dev]
+
+validate_install:
+	python scripts/validate_install
 
 prep_test:
 	python scripts/_make_eye3s.py

@@ -1,4 +1,4 @@
-# dimble
+https://github.com/pydicom/pydicom-data/blob/master/data_store/data/JPEG-LL.dcm?raw=true# dimble
 Nimble Digital Imaging for Medicine
 
 ## Installation
@@ -6,12 +6,13 @@ Nimble Digital Imaging for Medicine
 ```sh
 # using ssh
 git clone git@github.com:StrongCompute/dimble.git
-# using https
-https://github.com/StrongCompute/dimble.git
+# OR using https
+git clone https://github.com/StrongCompute/dimble.git
 
 cd dimble
 
-pip install .
+make install
+make validate_install
 ```
 
 
@@ -37,12 +38,12 @@ dimble.dimble_to_dicom("xray.dimble", "xray.dicom")
 ## Developing
 
 ```sh
-pip install .[dev]
+make install-dev
 ```
 
 ## Testing
 
 ```sh
-pip install .[dev]
+pip install-dev
 make test
 ```

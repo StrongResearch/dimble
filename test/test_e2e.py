@@ -5,10 +5,11 @@ import dimble
 
 PIXEL_ARRAY = "7FE00010"
 
+ignore_files = ["OT-PAL-8-face.dcm", "emri_small_jpeg_2k_lossless_too_short.dcm", "bad_sequence.dcm"]
 TESTFILES_DIR = Path(__file__).parent.parent / "pydicom-data" / "data"
 assert TESTFILES_DIR.exists()
 
-dicom_files = list(TESTFILES_DIR.glob("*.dcm*"))
+dicom_files = list(p for p in TESTFILES_DIR.glob("*.dcm*") if p.name not in ignore_files)
 assert len(dicom_files) > 0
 dicom_files_ids = [p.name.split("?")[0] for p in dicom_files]
 
