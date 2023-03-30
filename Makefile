@@ -3,6 +3,7 @@ install:
 
 prep_test:
 	python scripts/_make_eye3s.py
+	([ ! -d 'pydicom-data' ] && git clone https://github.com/pydicom/pydicom-data.git) || true
 
 test: prep_test
 	cargo test

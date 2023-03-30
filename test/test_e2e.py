@@ -5,9 +5,11 @@ import dimble
 
 PIXEL_ARRAY = "7FE00010"
 
-TESTFILES_DIR = Path(__file__).parent.parent / "downloaded_testfiles"
+TESTFILES_DIR = Path(__file__).parent.parent / "pydicom-data" / "data"
+assert TESTFILES_DIR.exists()
 
 dicom_files = list(TESTFILES_DIR.glob("*.dcm*"))
+assert len(dicom_files) > 0
 dicom_files_ids = [p.name.split("?")[0] for p in dicom_files]
 
 @pytest.mark.parametrize("dicom_file", dicom_files, ids=dicom_files_ids)

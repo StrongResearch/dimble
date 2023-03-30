@@ -1,12 +1,1 @@
-wget -P downloaded_testfiles --no-clobber https://github.com/cornerstonejs/dicomParser/blob/master/testImages/encapsulated/multi-frame/CT0012.explicit_little_endian.dcm?raw=true
-wget -P downloaded_testfiles --no-clobber https://github.com/cornerstonejs/dicomParser/blob/master/testImages/encapsulated/multi-frame/CT0012.fragmented_no_bot_jpeg_baseline.51.dcm?raw=true
-wget -P downloaded_testfiles --no-clobber https://github.com/cornerstonejs/dicomParser/blob/master/testImages/encapsulated/multi-frame/CT0012.fragmented_no_bot_jpeg_lossless.57.dcm?raw=true
-wget -P downloaded_testfiles --no-clobber https://github.com/cornerstonejs/dicomParser/blob/master/testImages/encapsulated/multi-frame/CT0012.fragmented_no_bot_jpeg_lossless.70.dcm?raw=true
-wget -P downloaded_testfiles --no-clobber https://github.com/cornerstonejs/dicomParser/blob/master/testImages/encapsulated/multi-frame/CT0012.fragmented_no_bot_jpeg_ls.80.dcm?raw=true
-wget -P downloaded_testfiles --no-clobber https://github.com/cornerstonejs/dicomParser/blob/master/testImages/encapsulated/multi-frame/CT0012.fragmented_no_bot_jpeg_ls.81.dcm?raw=true
-wget -P downloaded_testfiles --no-clobber https://github.com/cornerstonejs/dicomParser/blob/master/testImages/encapsulated/multi-frame/CT0012.not_fragmented_bot_jpeg_ls.80.dcm?raw=true
-wget -P downloaded_testfiles --no-clobber https://github.com/cornerstonejs/dicomParser/blob/master/testImages/encapsulated/multi-frame/CT0012.not_fragmented_bot_rle.dcm?raw=true
-wget -P downloaded_testfiles --no-clobber https://github.com/cornerstonejs/dicomParser/blob/master/testImages/encapsulated/multi-frame/CT0012.not_fragmented_no_bot_jpeg_ls.80.dcm?raw=true
-wget -P downloaded_testfiles --no-clobber https://github.com/cornerstonejs/dicomParser/blob/master/testImages/encapsulated/multi-frame/CT0012.not_fragmented_no_bot_rle.dcm?raw=true
-wget -P downloaded_testfiles --no-clobber https://github.com/cornerstonejs/dicomParser/blob/master/testImages/encapsulated/multi-frame/IM00001.fragmented_no_bot_jpeg_baseline.50.dcm?raw=true
-wget -P downloaded_testfiles --no-clobber https://github.com/cornerstonejs/dicomParser/blob/master/testImages/encapsulated/multi-frame/IM00001.implicit_little_endian.dcm?raw=true
+git clone https://github.com/pydicom/pydicom-data.git
