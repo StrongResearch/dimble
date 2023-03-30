@@ -10,22 +10,35 @@ import dimble
 
 
 def main():
+    print("downloading demo DICOM file")
     path = "https://github.com/pydicom/pydicom-data/blob/master/data_store/data/JPEG-LL.dcm?raw=true"
     local_path = Path("/tmp/JPEG-LL.dcm")
     if not local_path.exists():
-        os.system(f"wget {path} -O {local_path}")
+        os.system(f"wget {path} -O {local_path} -q")
+    print("OK")
+
+    print("converting to dimble")
     dimble_file = Path("/tmp/JPEG-LL.dimble")
     dimble_file.unlink(missing_ok=True)
     dimble.dicom_to_dimble(local_path, dimble_file)
+    print("OK")
+
+    print("loading dimble")
     dimble_ds = dimble.load_dimble(dimble_file, ["7FE00010", "00091040"])
     assert dimble_ds["00091040"] == "BERRA,JAMES"
     assert torch.is_tensor(dimble_ds["7FE00010"])
+    print("OK")
 
+    print("converting back to DICOM")
     recon_path = Path("/tmp/JPEG-LL.recon.dcm")
     recon_path.unlink(missing_ok=True)
     dimble.dimble_to_dicom(dimble_file, recon_path)
     assert recon_path.exists()
     ds = pydicom.dcmread(recon_path)
+    print("OK")
+
+    print()
+    print("Installation successful!")
 
 
 if __name__ == '__main__':
