@@ -1,4 +1,5 @@
-https://github.com/pydicom/pydicom-data/blob/master/data_store/data/JPEG-LL.dcm?raw=true# dimble
+# dimble
+
 Nimble Digital Imaging for Medicine
 
 ## Installation
@@ -14,7 +15,6 @@ cd dimble
 make install
 make validate_install
 ```
-
 
 
 ## Usage
@@ -35,15 +35,17 @@ dataset = dimble.load_dimble('xray.dimble', fields=["7FE00010"], device="cpu", s
 dimble.dimble_to_dicom("xray.dimble", "xray.dicom")
 ```
 
+
 ## Developing
 
 ```sh
 make install-dev
 ```
 
+
 ## Testing
 
 ```sh
-pip install-dev
+make install-dev
 make test
 ```

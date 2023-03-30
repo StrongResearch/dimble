@@ -1,8 +1,8 @@
 install:
-	pip install -e .
+	pip install .
 
 install-dev:
-	pip install -e .[dev]
+	pip install .[dev]
 
 validate_install:
 	python scripts/validate_install
