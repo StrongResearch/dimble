@@ -125,7 +125,8 @@ pub fn dimble_to_dicom_json(dimble_path: &str, json_path: &str) {
 
 fn deserialise_header(buffer: &[u8]) -> (HeaderFieldMap, usize) {
     let header_len = u64::from_le_bytes(buffer[0..8].try_into().unwrap()) as usize;
-    let header: HeaderFieldMap = rmp_serde::from_slice(&buffer[8..8 + header_len]).expect("failed to deserialise header");
+    let header: HeaderFieldMap =
+        rmp_serde::from_slice(&buffer[8..8 + header_len]).expect("failed to deserialise header");
     (header, header_len)
 }
 

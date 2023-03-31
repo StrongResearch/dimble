@@ -103,13 +103,19 @@ pub fn load_pixel_array(
     //     return DimbleError::new_err(format!("file too small to be a safetensors object"));
     // }
     let header_len = u64::from_le_bytes(
-        buffer[0..8]
-            .try_into()
-            .map_err(|e| DimbleError::new_err(format!("safetensors object should have 8 byte header: {e:?}")))?,
-            // .expect("safetensors object should have 8 byte header",
+        buffer[0..8].try_into().map_err(|e| {
+            DimbleError::new_err(format!(
+                "safetensors object should have 8 byte header: {e:?}"
+            ))
+        })?,
+        // .expect("safetensors object should have 8 byte header",
     ) as usize;
     let metadata: HashMetadata =
-        serde_json::from_slice(&buffer[8..8 + header_len]).map_err(|e| DimbleError::new_err(format!("safetensors object should have valid json header: {e:?}")))?;
+        serde_json::from_slice(&buffer[8..8 + header_len]).map_err(|e| {
+            DimbleError::new_err(format!(
+                "safetensors object should have valid json header: {e:?}"
+            ))
+        })?;
     let arr_info = metadata
         .tensors
         .get("pixel_array")
@@ -209,20 +215,24 @@ fn load_dimble(
     device: &str,
     slices: Option<Vec<&PySlice>>,
 ) -> PyResult<PyObject> {
-    let file = File::open(filename).map_err(|_| {
-        PyFileNotFoundError::new_err(format!("file not found: {}", filename))
-    })?;
+    let file = File::open(filename)
+        .map_err(|_| PyFileNotFoundError::new_err(format!("file not found: {}", filename)))?;
     let buffer = unsafe { MmapOptions::new().map(&file).expect("mmap should work") };
 
     let header_len = u64::from_le_bytes(
-        buffer[0..8]
-            .try_into()
-            .map_err(|e| DimbleError::new_err(format!("safetensors object should have 8 byte header len: {e:?}")))?
-            // .expect("file should have 8 byte header"),
+        buffer[0..8].try_into().map_err(|e| {
+            DimbleError::new_err(format!(
+                "safetensors object should have 8 byte header len: {e:?}"
+            ))
+        })?, // .expect("file should have 8 byte header"),
     ) as usize;
 
     let header: HeaderFieldMap =
-        rmp_serde::from_slice(&buffer[8..8 + header_len]).map_err(|e| DimbleError::new_err(format!("safetensors object should have valid msgpack header: {e:?}")))?;
+        rmp_serde::from_slice(&buffer[8..8 + header_len]).map_err(|e| {
+            DimbleError::new_err(format!(
+                "safetensors object should have valid msgpack header: {e:?}"
+            ))
+        })?;
 
     Python::with_gil(|py| -> PyResult<PyObject> {
         let obj = PyDict::new(py);
@@ -381,7 +391,6 @@ mod tests {
         assert_eq!(recon_json["00080008"]["Value"][2], "OTHER");
         assert_eq!(recon_json["00080008"]["vr"], "CS");
     }
-
 
     #[test]
     fn test_integration_no_value() {
