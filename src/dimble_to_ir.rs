@@ -15,7 +15,7 @@ pub fn dimble_to_dicom_json(dimble_path: &str, json_path: &str) {
     for (tag, header_field) in header.iter() {
         match *header_field {
             HeaderField::Deffered(field_pos, field_length, vr) => {
-                let vr = String::from_utf8(vr.to_vec()).unwrap();
+                let vr = String::from_utf8(vr.to_vec()).expect("expected vr to be utf8");
                 // inline_binary VRs are OB and OW. TODO support the other inline binary VRs
                 let field_pos: usize = (field_pos as usize) + header_len + 8;
                 let field_length = field_length as usize;
@@ -125,7 +125,7 @@ pub fn dimble_to_dicom_json(dimble_path: &str, json_path: &str) {
 
 fn deserialise_header(buffer: &[u8]) -> (HeaderFieldMap, usize) {
     let header_len = u64::from_le_bytes(buffer[0..8].try_into().unwrap()) as usize;
-    let header: HeaderFieldMap = rmp_serde::from_slice(&buffer[8..8 + header_len]).unwrap();
+    let header: HeaderFieldMap = rmp_serde::from_slice(&buffer[8..8 + header_len]).expect("failed to deserialise header");
     (header, header_len)
 }
 

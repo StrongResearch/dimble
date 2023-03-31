@@ -3,6 +3,7 @@ mod dimble_to_ir;
 mod ir_to_dimble;
 use ir_to_dimble::{HeaderField, HeaderFieldMap};
 use memmap2::MmapOptions;
+use pyo3::exceptions::PyFileNotFoundError;
 use pyo3::intern;
 use pyo3::once_cell::GILOnceCell;
 use pyo3::prelude::*;
@@ -22,39 +23,41 @@ use std::io::Cursor;
 
 static TORCH_MODULE: GILOnceCell<Py<PyModule>> = GILOnceCell::new();
 
-#[derive(Debug)]
-pub enum DimbleError {
-    IoError(std::io::Error),
-    MsgpackError(rmp_serde::decode::Error),
-    MsgpackValueError(rmpv::decode::Error),
-    JsonError(serde_json::Error),
-}
+// #[derive(Debug)]
+// pub enum DimbleError {
+//     HeaderTooLarge,
+//     HeaderTooSmall,
+//     IoError(std::io::Error),
+//     MsgpackError(rmp_serde::decode::Error),
+//     MsgpackValueError(rmpv::decode::Error),
+//     JsonError(serde_json::Error),
+// }
 
-impl From<std::io::Error> for DimbleError {
-    fn from(err: std::io::Error) -> Self {
-        DimbleError::IoError(err)
-    }
-}
+// impl From<std::io::Error> for DimbleError {
+//     fn from(err: std::io::Error) -> Self {
+//         DimbleError::IoError(err)
+//     }
+// }
 
-impl From<rmp_serde::decode::Error> for DimbleError {
-    fn from(err: rmp_serde::decode::Error) -> Self {
-        DimbleError::MsgpackError(err)
-    }
-}
+// impl From<rmp_serde::decode::Error> for DimbleError {
+//     fn from(err: rmp_serde::decode::Error) -> Self {
+//         DimbleError::MsgpackError(err)
+//     }
+// }
 
-impl From<rmpv::decode::Error> for DimbleError {
-    fn from(err: rmpv::decode::Error) -> Self {
-        DimbleError::MsgpackValueError(err)
-    }
-}
+// impl From<rmpv::decode::Error> for DimbleError {
+//     fn from(err: rmpv::decode::Error) -> Self {
+//         DimbleError::MsgpackValueError(err)
+//     }
+// }
 
-impl std::fmt::Display for DimbleError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self:?}")
-    }
-}
+// impl std::fmt::Display for DimbleError {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         write!(f, "{self:?}")
+//     }
+// }
 
-impl std::error::Error for DimbleError {}
+// impl std::error::Error for DimbleError {}
 
 #[pyfunction]
 fn dicom_json_to_dimble(
@@ -96,13 +99,17 @@ pub fn load_pixel_array(
             .map(&file)
             .expect("mmap should work")
     };
+    // if buffer.len() < 8 {
+    //     return DimbleError::new_err(format!("file too small to be a safetensors object"));
+    // }
     let header_len = u64::from_le_bytes(
         buffer[0..8]
             .try_into()
-            .expect("safetensors object should have 8 byte header"),
+            .map_err(|e| DimbleError::new_err(format!("safetensors object should have 8 byte header: {e:?}")))?,
+            // .expect("safetensors object should have 8 byte header",
     ) as usize;
     let metadata: HashMetadata =
-        serde_json::from_slice(&buffer[8..8 + header_len]).expect("metadata should be valid json");
+        serde_json::from_slice(&buffer[8..8 + header_len]).map_err(|e| DimbleError::new_err(format!("safetensors object should have valid json header: {e:?}")))?;
     let arr_info = metadata
         .tensors
         .get("pixel_array")
@@ -202,17 +209,20 @@ fn load_dimble(
     device: &str,
     slices: Option<Vec<&PySlice>>,
 ) -> PyResult<PyObject> {
-    let file = File::open(filename).unwrap();
+    let file = File::open(filename).map_err(|_| {
+        PyFileNotFoundError::new_err(format!("file not found: {}", filename))
+    })?;
     let buffer = unsafe { MmapOptions::new().map(&file).expect("mmap should work") };
 
     let header_len = u64::from_le_bytes(
         buffer[0..8]
             .try_into()
-            .expect("file should have 8 byte header"),
+            .map_err(|e| DimbleError::new_err(format!("safetensors object should have 8 byte header len: {e:?}")))?
+            // .expect("file should have 8 byte header"),
     ) as usize;
 
     let header: HeaderFieldMap =
-        rmp_serde::from_slice(&buffer[8..8 + header_len]).expect("header should be valid");
+        rmp_serde::from_slice(&buffer[8..8 + header_len]).map_err(|e| DimbleError::new_err(format!("safetensors object should have valid msgpack header: {e:?}")))?;
 
     Python::with_gil(|py| -> PyResult<PyObject> {
         let obj = PyDict::new(py);
@@ -252,12 +262,20 @@ fn load_dimble(
     })
 }
 
+pyo3::create_exception!(
+    dimble_rs,
+    DimbleError,
+    pyo3::exceptions::PyException,
+    "Custom Python Exception for Dimble errors."
+);
+
 #[pymodule]
-fn dimble_rs(_py: Python, m: &PyModule) -> PyResult<()> {
+fn dimble_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(dicom_json_to_dimble))?;
     m.add_wrapped(wrap_pyfunction!(dimble_to_dicom_json))?;
     m.add_wrapped(wrap_pyfunction!(load_dimble))?;
     m.add_wrapped(wrap_pyfunction!(load_pixel_array))?;
+    m.add("DimbleError", py.get_type::<DimbleError>())?;
     Ok(())
 }
 
@@ -363,6 +381,7 @@ mod tests {
         assert_eq!(recon_json["00080008"]["Value"][2], "OTHER");
         assert_eq!(recon_json["00080008"]["vr"], "CS");
     }
+
 
     #[test]
     fn test_integration_no_value() {
