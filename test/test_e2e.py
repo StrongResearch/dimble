@@ -43,7 +43,6 @@ def test_dicom_to_dimble(dicom_file: Path):
     dimble_file = Path("/tmp") / dicom_file.with_suffix(".dimble").name
     pydicom.dcmread(dicom_file)
     dimble.dicom_to_dimble(dicom_file, dimble_file)
-    print(dicom_file)
 
 
 @pytest.mark.parametrize("dicom_file", dicom_files, ids=dicom_files_ids)

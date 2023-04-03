@@ -14,8 +14,6 @@ use pyo3::types::PySlice;
 use pyo3::wrap_pyfunction;
 use rmpv::decode::read_value;
 use rmpv::Value;
-use safetensors::tensor::Dtype;
-use safetensors::tensor::TensorInfo;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
@@ -73,6 +71,51 @@ fn dimble_to_dicom_json(dimble_path: &str, json_path: &str) {
     dimble_to_ir::dimble_to_dicom_json(dimble_path, json_path);
 }
 
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct TensorInfo {
+    /// The type of each element of the tensor
+    pub dtype: Dtype,
+    /// The shape of the tensor
+    pub shape: Vec<usize>,
+    /// The offsets to find the data within the byte-buffer array.
+    pub data_offsets: (usize, usize),
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
+#[non_exhaustive]
+pub enum Dtype {
+    /// Boolan type
+    BOOL,
+    /// Unsigned byte
+    U8,
+    /// Signed byte
+    I8,
+    /// Signed integer (16-bit)
+    I16,
+    /// Unsigned integer (16-bit)
+    U16,
+    /// Half-precision floating point
+    F16,
+    /// Brain floating point
+    BF16,
+    /// Signed integer (32-bit)
+    I32,
+    /// Unsigned integer (32-bit)
+    U32,
+    /// Floating point (32-bit)
+    F32,
+    /// Floating point (64-bit)
+    F64,
+    /// Signed integer (64-bit)
+    I64,
+    /// Unsigned integer (64-bit)
+    U64,
+    /// Complex number (64-bit)
+    C64,
+    /// Complex number (128-bit)
+    C128
+}
+
 /// Helper struct used only for safetensors deserialization
 #[derive(Debug, Serialize, Deserialize)]
 struct HashMetadata {
@@ -81,6 +124,28 @@ struct HashMetadata {
     metadata: Option<HashMap<String, String>>,
     #[serde(flatten)]
     tensors: HashMap<String, TensorInfo>,
+}
+
+fn get_pydtype(module: &PyModule, dtype: Dtype) -> PyResult<PyObject> {
+    Python::with_gil(|py| {
+        let dtype: PyObject = match dtype {
+            Dtype::U8 => module.getattr(intern!(py, "uint8"))?.into(),
+            Dtype::I8 => module.getattr(intern!(py, "int8"))?.into(),
+            Dtype::I16 => module.getattr(intern!(py, "int16"))?.into(),
+            Dtype::I32 => module.getattr(intern!(py, "int32"))?.into(),
+            Dtype::I64 => module.getattr(intern!(py, "int64"))?.into(),
+            Dtype::F16 => module.getattr(intern!(py, "float16"))?.into(),
+            Dtype::F32 => module.getattr(intern!(py, "float32"))?.into(),
+            Dtype::F64 => module.getattr(intern!(py, "float64"))?.into(),
+            Dtype::BF16 => module.getattr(intern!(py, "bfloat16"))?.into(),
+            Dtype::C64 => module.getattr(intern!(py, "complex64"))?.into(),
+            Dtype::C128 => module.getattr(intern!(py, "complex128"))?.into(),
+            dtype => {
+                panic!("Dtype not understood: {dtype:?}");
+            }
+        };
+        Ok(dtype)
+    })
 }
 
 #[pyfunction]
@@ -116,11 +181,11 @@ pub fn load_pixel_array(
                 "safetensors object should have valid json header: {e:?}"
             ))
         })?;
+    // println!("metadata: {:#?}", metadata);
     let arr_info = metadata
         .tensors
         .get("pixel_array")
         .expect("pixel_array should be in metadata");
-    assert_eq!(arr_info.dtype, Dtype::F32); // this is what dimble is hardcoded to do for now. TODO support other dtypes.
 
     let file_size = st_offset + st_length;
     let header_offset = header_len + 8;
@@ -149,9 +214,9 @@ pub fn load_pixel_array(
 
         // as array kwargs
         let torch_uint8 = torch.getattr(intern!(py, "uint8"))?;
-        let torch_float32 = torch.getattr(intern!(py, "float32"))?; // TODO unhardcode
+        let torch_dtype = get_pydtype(&torch, arr_info.dtype)?;
         let kwargs = [(intern!(py, "dtype"), torch_uint8)].into_py_dict(py);
-        let view_kwargs = [(intern!(py, "dtype"), torch_float32)].into_py_dict(py);
+        let view_kwargs = [(intern!(py, "dtype"), torch_dtype)].into_py_dict(py);
         let shape: PyObject = arr_info.shape.clone().into_py(py);
 
         // as array
