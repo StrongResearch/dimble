@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import pydicom
@@ -34,6 +35,8 @@ dicom_files = list(
     for p in TESTFILES_DIR.glob("*.dcm*")
     if p.name not in ignore_files and "recon" not in p.name
 )
+if os.getenv("E2ESMALL", None):
+    dicom_files = dicom_files[:1]
 assert len(dicom_files) > 0
 dicom_files_ids = [p.name.split("?")[0] for p in dicom_files]
 

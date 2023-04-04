@@ -1,8 +1,9 @@
 from pathlib import Path
+
 import pytest
-import numpy as np
-import dimble
 import torch
+
+import dimble
 
 TESTFILES_DIR = Path(__file__).parent.parent / "pydicom-data" / "data"
 assert TESTFILES_DIR.exists()
@@ -37,6 +38,7 @@ DTYPES = [
     # "complex128",
     "NOT A REAL DTYPE",
 ]
+
 
 @pytest.mark.parametrize("dtype", DTYPES, ids=str)
 def test_load_and_convert_dtype(dtype):

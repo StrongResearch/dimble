@@ -113,7 +113,7 @@ pub enum Dtype {
     /// Complex number (64-bit)
     C64,
     /// Complex number (128-bit)
-    C128
+    C128,
 }
 
 /// Helper struct used only for safetensors deserialization
@@ -175,6 +175,7 @@ pub fn load_pixel_array(
         })?,
         // .expect("safetensors object should have 8 byte header",
     ) as usize;
+    println!("header_len: {}", header_len);
     let metadata: HashMetadata =
         serde_json::from_slice(&buffer[8..8 + header_len]).map_err(|e| {
             DimbleError::new_err(format!(
@@ -214,7 +215,7 @@ pub fn load_pixel_array(
 
         // as array kwargs
         let torch_uint8 = torch.getattr(intern!(py, "uint8"))?;
-        let torch_dtype = get_pydtype(&torch, arr_info.dtype)?;
+        let torch_dtype = get_pydtype(torch, arr_info.dtype)?;
         let kwargs = [(intern!(py, "dtype"), torch_uint8)].into_py_dict(py);
         let view_kwargs = [(intern!(py, "dtype"), torch_dtype)].into_py_dict(py);
         let shape: PyObject = arr_info.shape.clone().into_py(py);
@@ -273,41 +274,42 @@ fn value_to_py(py: Python, value: Value) -> PyObject {
     }
 }
 
-#[pyfunction]
-fn load_dimble(
+fn get_field(py: Python, buffer: &[u8], field_pos: usize, field_length: usize) -> Py<PyAny> {
+    let field_bytes = &buffer[field_pos..field_pos + field_length];
+    let mut cursor = Cursor::new(field_bytes);
+    let field_value = read_value(&mut cursor).expect("should be valid messagepack"); // TODO better error handling
+    value_to_py(py, field_value)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn header_fields_and_buffer_to_pydict(
+    py: Python,
+    header: &HeaderFieldMap,
+    header_len: usize,
+    dimble_buffer: &[u8],
+    fields: Option<Vec<&str>>,
     filename: &str,
-    fields: Vec<&str>,
     device: &str,
-    slices: Option<Vec<&PySlice>>,
+    slices: &Option<Vec<&PySlice>>,
 ) -> PyResult<PyObject> {
-    let file = File::open(filename)
-        .map_err(|_| PyFileNotFoundError::new_err(format!("file not found: {}", filename)))?;
-    let buffer = unsafe { MmapOptions::new().map(&file).expect("mmap should work") };
+    let dataset = PyDict::new(py);
+    let fields = match fields {
+        Some(fields) => fields,
+        None => header.keys().map(|k| k.as_str()).collect(),
+    };
+    for field in fields {
+        match header.get(field) {
+            Some(HeaderField::Deffered(field_pos, field_length, _vr)) => {
+                // return the field value
 
-    let header_len = u64::from_le_bytes(
-        buffer[0..8].try_into().map_err(|e| {
-            DimbleError::new_err(format!(
-                "safetensors object should have 8 byte header len: {e:?}"
-            ))
-        })?, // .expect("file should have 8 byte header"),
-    ) as usize;
-
-    let header: HeaderFieldMap =
-        rmp_serde::from_slice(&buffer[8..8 + header_len]).map_err(|e| {
-            DimbleError::new_err(format!(
-                "safetensors object should have valid msgpack header: {e:?}"
-            ))
-        })?;
-
-    Python::with_gil(|py| -> PyResult<PyObject> {
-        let obj = PyDict::new(py);
-
-        for field in fields {
-            if let HeaderField::Deffered(field_pos, field_length, _vr) =
-                *header.get(field).expect("expected field to exist")
-            {
-                let field_pos = (field_pos as usize) + header_len + 8;
-                let field_length = field_length as usize;
+                let field_pos = *field_pos as usize + header_len + 8;
+                let field_length = *field_length as usize;
+                println!(
+                    "field: {field}, field_pos: {field_pos}, field_length: {field_length}",
+                    field = field,
+                    field_pos = field_pos,
+                    field_length = field_length
+                );
 
                 match field {
                     "7FE00010" => {
@@ -318,24 +320,186 @@ fn load_dimble(
                             device,
                             slices.clone(),
                         )?;
-                        obj.set_item("7FE00010", tensor)
+                        dataset
+                            .set_item("7FE00010", tensor)
                             .expect("inserting should work");
                     }
                     _ => {
-                        let field_bytes = &buffer[field_pos..field_pos + field_length];
-                        let mut cursor = Cursor::new(field_bytes);
-                        let field_value = read_value(&mut cursor).expect("msg");
-                        let py_field = value_to_py(py, field_value);
-                        obj.set_item(field, py_field)
+                        let py_field = get_field(py, dimble_buffer, field_pos, field_length);
+                        dataset
+                            .set_item(field, py_field)
                             .expect("inserting should work");
                     }
                 }
             }
+            Some(HeaderField::SQ(sq)) => {
+                // return all fields of the sequence (In the future we might support lazy loading of sequence items)
+                //
+                let sq = sq.first().expect("sq should have at least one item");
+                let sq_dict = header_fields_and_buffer_to_pydict(
+                    py,
+                    sq,
+                    header_len,
+                    dimble_buffer,
+                    None,
+                    filename,
+                    device,
+                    slices,
+                )
+                .unwrap();
+                dataset
+                    .set_item(field, sq_dict)
+                    .expect("inserting should work");
+            }
+            Some(HeaderField::Empty(_vr)) => {
+                // return None
+                dataset
+                    .set_item(field, py.None())
+                    .expect("inserting should work");
+            }
+            None => {
+                println!("field not found: {}", field);
+                println!("header: {:?}", header);
+                panic!("field not found: {}", field);
+            }
         }
-
-        Ok(obj.to_object(py))
-    })
+    }
+    Ok(dataset.into_py(py))
 }
+
+fn deserialise_dimble_header(buffer: &[u8]) -> Result<(HeaderFieldMap, usize), DimbleError> {
+    // TODO better error handling, this is a mess
+    let header_len = u64::from_le_bytes(
+        buffer[0..8]
+            .try_into()
+            .map_err(|e| {
+                DimbleError::new_err(format!(
+                    "safetensors object should have 8 byte header len: {e:?}"
+                ))
+            })
+            .expect("file should have 8 byte header"),
+    ) as usize;
+
+    let header: HeaderFieldMap = rmp_serde::from_slice(&buffer[8..8 + header_len])
+        .map_err(|e| {
+            DimbleError::new_err(format!(
+                "safetensors object should have valid header: {e:?}"
+            ))
+        })
+        .expect("file should have valid header");
+
+    Ok((header, header_len))
+}
+
+#[pyfunction]
+fn load_dimble(
+    filename: &str,
+    fields: Vec<&str>,
+    device: &str,
+    slices: Option<Vec<&PySlice>>,
+) -> PyResult<PyObject> {
+    // this function takes in a filename and some fields and loads the data of those fields into a python dict
+
+    let file = File::open(filename)
+        .map_err(|_| PyFileNotFoundError::new_err(format!("file not found: {}", filename)))?;
+    let buffer = unsafe { MmapOptions::new().map(&file).expect("mmap should work") };
+
+    let (header, header_len) = deserialise_dimble_header(&buffer).expect("header should be valid"); // TODO better error handling
+
+    let dataset = Python::with_gil(|py| {
+        header_fields_and_buffer_to_pydict(
+            py,
+            &header,
+            header_len,
+            &buffer,
+            Some(fields),
+            filename,
+            device,
+            &slices,
+        )
+        .unwrap()
+    });
+
+    Ok(dataset)
+}
+
+// #[pyfunction]
+// fn load_dimble(
+//     filename: &str,
+//     fields: Vec<&str>,
+//     device: &str,
+//     slices: Option<Vec<&PySlice>>,
+// ) -> PyResult<PyObject> {
+//     let file = File::open(filename)
+//         .map_err(|_| PyFileNotFoundError::new_err(format!("file not found: {}", filename)))?;
+//     let buffer = unsafe { MmapOptions::new().map(&file).expect("mmap should work") };
+
+//     let header_len = u64::from_le_bytes(
+//         buffer[0..8].try_into().map_err(|e| {
+//             DimbleError::new_err(format!(
+//                 "safetensors object should have 8 byte header len: {e:?}"
+//             ))
+//         })?, // .expect("file should have 8 byte header"),
+//     ) as usize;
+
+//     let header: HeaderFieldMap =
+//         rmp_serde::from_slice(&buffer[8..8 + header_len]).map_err(|e| {
+//             DimbleError::new_err(format!(
+//                 "safetensors object should have valid msgpack header: {e:?}"
+//             ))
+//         })?;
+
+//     Python::with_gil(|py| -> PyResult<PyObject> {
+//         let obj = PyDict::new(py);
+
+//         for field in fields {
+//             match header.get(field) {
+//                 Some(HeaderField::Deffered(field_pos, field_length, _vr)) => {
+
+//                     let field_pos = (*field_pos as usize) + header_len + 8;
+//                     let field_length = *field_length as usize;
+
+//                     match field {
+//                         "7FE00010" => {
+//                             let tensor = load_pixel_array(
+//                                 filename,
+//                                 field_pos,
+//                                 field_length,
+//                                 device,
+//                                 slices.clone(),
+//                             )?;
+//                             obj.set_item("7FE00010", tensor)
+//                                 .expect("inserting should work");
+//                         }
+//                         _ => {
+//                             let field_bytes = &buffer[field_pos..field_pos + field_length];
+//                             let mut cursor = Cursor::new(field_bytes);
+//                             let field_value = read_value(&mut cursor).expect("msg");
+//                             let py_field = value_to_py(py, field_value);
+//                             obj.set_item(field, py_field)
+//                                 .expect("inserting should work");
+//                         }
+//                     }
+//                 },
+//                 Some(HeaderField::SQ(sq)) => {
+//                     let sq = sq.first().expect("sq should have at least one item");
+//                     for (tag, sq_field) in sq.iter() {
+
+//                     }
+//                 },
+//                 Some(HeaderField::Empty(_vr)) => {
+//                     obj.set_item(field, py.None())
+//                         .expect("inserting should work");
+//                 }
+//                 None => {
+//                     panic!("field not found: {}", field);
+//                 }
+//             }
+//         }
+
+//         Ok(obj.to_object(py))
+//     })
+// }
 
 pyo3::create_exception!(
     dimble_rs,

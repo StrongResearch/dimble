@@ -8,7 +8,9 @@ from safetensors.numpy import save_file
 from dimble_rs import dimble_rs
 
 
-def _dicom_to_ir(dicom_path: Path, output_name: str, dtype=np.float32) -> dict[str, Path]:
+def _dicom_to_ir(
+    dicom_path: Path, output_name: str, dtype=np.float32
+) -> dict[str, Path]:
     ds = pydicom.dcmread(dicom_path)
     output_json = Path(output_name + ".json")
     output_pixel_array = Path(output_name + ".safetensors")
@@ -31,7 +33,9 @@ def _dimble_to_ir(dimble_path: Path, output_path: Path) -> None:
 
 def dicom_to_dimble(dicom_path: Path, output_path: Path, dtype=np.float32) -> None:
     dicom_path = Path(dicom_path)
-    ir_paths = _dicom_to_ir(dicom_path, str(Path("/tmp") / (dicom_path.stem + ".ir")), dtype=dtype)
+    ir_paths = _dicom_to_ir(
+        dicom_path, str(Path("/tmp") / (dicom_path.stem + ".ir")), dtype=dtype
+    )
     try:
         _ir_to_dimble(ir_paths["json"], ir_paths["pixel_array"], output_path)
     finally:
