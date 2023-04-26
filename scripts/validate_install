@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 import os
+import tempfile
+
 from pathlib import Path
 
 import pydicom
@@ -10,15 +12,16 @@ import dimble
 
 
 def main():
+    temp_dir = tempfile.gettempdir()
     print("downloading demo DICOM file")
     path = "https://github.com/pydicom/pydicom-data/blob/master/data_store/data/JPEG-LL.dcm?raw=true"
-    local_path = Path("/tmp/JPEG-LL.dcm")
+    local_path = Path(temp_dir + "/JPEG-LL.dcm")
     if not local_path.exists():
         os.system(f"wget {path} -O {local_path} -q")
     print("OK")
 
     print("converting to dimble")
-    dimble_file = Path("/tmp/JPEG-LL.dimble")
+    dimble_file = Path(temp_dir + "/JPEG-LL.dimble")
     dimble_file.unlink(missing_ok=True)
     dimble.dicom_to_dimble(local_path, dimble_file)
     print("OK")
@@ -30,7 +33,7 @@ def main():
     print("OK")
 
     print("converting back to DICOM")
-    recon_path = Path("/tmp/JPEG-LL.recon.dcm")
+    recon_path = Path(temp_dir + "/JPEG-LL.recon.dcm")
     recon_path.unlink(missing_ok=True)
     dimble.dimble_to_dicom(dimble_file, recon_path)
     assert recon_path.exists()
