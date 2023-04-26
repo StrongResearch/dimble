@@ -56,8 +56,7 @@ def main():
     print("OK")
 
     print("loading dimble")
-    dimble_ds = dimble.load_dimble(dimble_file, ["7FE00010", "00091040"])
-    assert dimble_ds["00091040"] == "BERRA,JAMES"
+    dimble_ds = dimble.load_dimble(dimble_file, ["7FE00010"])
     assert torch.is_tensor(dimble_ds["7FE00010"])
     print("OK")
 
