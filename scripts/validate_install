@@ -2,6 +2,7 @@
 
 import os
 import tempfile
+import urllib.request
 
 from pathlib import Path
 
@@ -17,7 +18,7 @@ def main():
     path = "https://github.com/pydicom/pydicom-data/blob/master/data_store/data/JPEG-LL.dcm?raw=true"
     local_path = Path(temp_dir + "/JPEG-LL.dcm")
     if not local_path.exists():
-        os.system(f"wget {path} -O {local_path} -q")
+        urllib.request.urlretrieve(path, 'local_path')
     print("OK")
 
     print("converting to dimble")
