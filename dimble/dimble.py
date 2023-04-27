@@ -4,9 +4,8 @@ from pathlib import Path
 import numpy as np
 import pydicom
 import SimpleITK as sitk
-from safetensors.numpy import save_file
-
 from dimble_rs import dimble_rs
+from safetensors.numpy import save_file
 
 
 def _dicom_to_ir(
@@ -29,7 +28,18 @@ def _nifti_to_ir(
 ) -> dict[str, Path]:
     # code adapted from https://stackoverflow.com/a/64012212
     itk_image = sitk.ReadImage(image_path)
-    ds_json_dict = {k: itk_image.GetMetaData(k) for k in itk_image.GetMetaDataKeys()}
+    ds_json_dict = {}
+    for k in itk_image.GetMetaDataKeys():
+        entry = {
+            "vr": "CS",
+            "Value": [itk_image.GetMetaData(k)],
+        }
+        ds_json_dict[k] = entry
+    ds_json_dict["7FE00010"] = {
+        "vr": "OW",
+        "Value": None,
+        "InlineBinary": "Placeholder",
+    }
     output_json = Path(output_name + ".json")
     output_pixel_array = Path(output_name + ".safetensors")
     with open(output_json, "w") as f:
@@ -62,7 +72,7 @@ def dicom_to_dimble(dicom_path: Path, output_path: Path, dtype=np.float32) -> No
 
 def nifti_to_dimble(image_path: Path, output_path: Path, dtype=np.float32) -> None:
     image_path = Path(image_path)
-    ir_paths = _dicom_to_ir(
+    ir_paths = _nifti_to_ir(
         image_path, str(Path("/tmp") / (image_path.stem + ".ir")), dtype=dtype
     )
     try:
@@ -104,14 +114,15 @@ def dimble_to_nifti(dimble_path: Path, output_path: Path) -> None:
 
     pixel_data = dimble_ds["7FE00010"].numpy()
 
-    itk_image = sitk.GetImageFromArray(pixel_data.astype(np.uint16))  # unsure if the type conversion is needed
+    itk_image = sitk.GetImageFromArray(pixel_data)
 
     try:
         _dimble_to_ir(dimble_path, ir_path)
         with open(ir_path) as f:
-            json = f.read()
-            for k in json:
-                itk_image.SetMetaData(k)
+            json_ds = json.load(f)
+            for k in json_ds:
+                if k != "7FE00010":
+                    itk_image.SetMetaData(k, json_ds[k]["Value"][0])
         sitk.WriteImage(itk_image, output_path)
     finally:
         ir_path.unlink(missing_ok=True)

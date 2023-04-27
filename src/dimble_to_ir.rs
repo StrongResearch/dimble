@@ -10,7 +10,6 @@ fn headerfield_and_bytes_to_dicom_fields(
     header_field: &HeaderField,
     dimble_buffer: &[u8],
 ) -> DicomField {
-    dbg!(tag);
     match header_field {
         HeaderField::Empty(vr) => {
             let vr = String::from_utf8(vr.to_vec()).unwrap();
