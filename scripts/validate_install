@@ -13,7 +13,7 @@ import dimble
 
 
 def main():
-    temp_dir = tempfile.gettempdir()
+    temp_dir = dimble.create_temp_dir()
     print("downloading demo DICOM file")
     path = "https://github.com/pydicom/pydicom-data/blob/master/data_store/data/JPEG-LL.dcm?raw=true"
     local_path = Path(temp_dir + "/JPEG-LL.dcm")
