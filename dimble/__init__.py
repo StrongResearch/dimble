@@ -4,6 +4,7 @@ from .dimble import (
     dimble_to_nifti,
     load_dimble,
     nifti_to_dimble,
+    create_temp_dir,
 )
 
 __all__ = [
