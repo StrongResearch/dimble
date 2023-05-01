@@ -1,4 +1,5 @@
-import json, tempfile
+import json
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -12,6 +13,7 @@ def _create_temp_dir() -> Path:
     temp_dir = Path(tempfile.gettempdir())
     temp_dir.mkdir(parents=True, exist_ok=True)
     return temp_dir
+
 
 def _dicom_to_ir(
     dicom_path: Path, output_name: str, dtype=np.float32
