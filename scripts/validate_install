@@ -13,16 +13,16 @@ import dimble
 
 
 def main():
-    temp_dir = dimble.create_temp_dir()
+    temp_dir = dimble._create_temp_dir()
     print("downloading demo DICOM file")
     path = "https://github.com/pydicom/pydicom-data/blob/master/data_store/data/JPEG-LL.dcm?raw=true"
-    local_path = Path(temp_dir + "/JPEG-LL.dcm")
+    local_path = temp_dir / "JPEG-LL.dcm"
     if not local_path.exists():
         urllib.request.urlretrieve(path, local_path)
     print("OK")
 
     print("converting to dimble")
-    dimble_file = Path(temp_dir + "/JPEG-LL.dimble")
+    dimble_file = temp_dir / "JPEG-LL.dimble"
     dimble_file.unlink(missing_ok=True)
     dimble.dicom_to_dimble(local_path, dimble_file)
     print("OK")
@@ -34,7 +34,7 @@ def main():
     print("OK")
 
     print("converting back to DICOM")
-    recon_path = Path(temp_dir + "/JPEG-LL.recon.dcm")
+    recon_path = temp_dir / "JPEG-LL.recon.dcm"
     recon_path.unlink(missing_ok=True)
     dimble.dimble_to_dicom(dimble_file, recon_path)
     assert recon_path.exists()
@@ -43,13 +43,13 @@ def main():
 
     print("downloading demo NIfTI file")
     path = "https://nifti.nimh.nih.gov/nifti-1/data/zstat1.nii.gz"
-    local_path = Path(temp_dir + "/input.nii.gz")
+    local_path = temp_dir / "input.nii.gz"
     if not local_path.exists():
         urllib.request.urlretrieve(path, local_path)
     print("OK")
 
     print("converting to dimble")
-    dimble_file = Path(temp_dir + "/input.dimble")
+    dimble_file = temp_dir / "input.dimble"
     dimble_file.unlink(missing_ok=True)
     dimble.nifti_to_dimble(local_path, dimble_file)
     print("OK")
@@ -60,7 +60,7 @@ def main():
     print("OK")
 
     print("converting back to NIfTI")
-    recon_path = Path(temp_dir + "/input.recon.nii.gz")
+    recon_path = temp_dir / "input.recon.nii.gz"
     recon_path.unlink(missing_ok=True)
     dimble.dimble_to_nifti(dimble_file, recon_path)
     assert recon_path.exists()

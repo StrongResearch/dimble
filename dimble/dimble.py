@@ -8,7 +8,7 @@ from dimble_rs import dimble_rs
 from safetensors.numpy import save_file
 
 
-def create_temp_dir() -> Path:
+def _create_temp_dir() -> Path:
     temp_dir = Path(tempfile.gettempdir())
     temp_dir.mkdir(parents=True, exist_ok=True)
     return temp_dir
@@ -65,9 +65,8 @@ def _dimble_to_ir(dimble_path: Path, output_path: Path) -> None:
 
 def dicom_to_dimble(dicom_path: Path, output_path: Path, dtype=np.float32) -> None:
     dicom_path = Path(dicom_path)
-    create_temp_dir()
     ir_paths = _dicom_to_ir(
-        dicom_path, str(Path(create_temp_dir()) / (dicom_path.stem + ".ir")), dtype=dtype
+        dicom_path, str(_create_temp_dir() / (dicom_path.stem + ".ir")), dtype=dtype
     )
     try:
         _ir_to_dimble(ir_paths["json"], ir_paths["pixel_array"], output_path)
@@ -79,7 +78,7 @@ def dicom_to_dimble(dicom_path: Path, output_path: Path, dtype=np.float32) -> No
 def nifti_to_dimble(image_path: Path, output_path: Path, dtype=np.float32) -> None:
     image_path = Path(image_path)
     ir_paths = _nifti_to_ir(
-        image_path, str(Path(create_temp_dir()) / (image_path.stem + ".ir")), dtype=dtype
+        image_path, str(_create_temp_dir() / (image_path.stem + ".ir")), dtype=dtype
     )
     try:
         _ir_to_dimble(ir_paths["json"], ir_paths["pixel_array"], output_path)
@@ -94,7 +93,7 @@ def load_dimble(path: Path, fields: list[str], device="cpu", slices=None):
 
 def dimble_to_dicom(dimble_path: Path, output_path: Path) -> None:
     dimble_path = Path(dimble_path)
-    ir_path = Path(create_temp_dir()) / (dimble_path.stem + ".ir.json")
+    ir_path = _create_temp_dir() / (dimble_path.stem + ".ir.json")
     dimble_ds = load_dimble(dimble_path, ["7FE00010"])
 
     pixel_data = dimble_ds["7FE00010"].numpy()
@@ -115,7 +114,7 @@ def dimble_to_dicom(dimble_path: Path, output_path: Path) -> None:
 
 def dimble_to_nifti(dimble_path: Path, output_path: Path) -> None:
     dimble_path = Path(dimble_path)
-    ir_path = Path(create_temp_dir()) / (dimble_path.stem + ".ir.json")
+    ir_path = _create_temp_dir() / (dimble_path.stem + ".ir.json")
     dimble_ds = load_dimble(dimble_path, ["7FE00010"])
 
     pixel_data = dimble_ds["7FE00010"].numpy()

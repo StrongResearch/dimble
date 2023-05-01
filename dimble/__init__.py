@@ -4,7 +4,7 @@ from .dimble import (
     dimble_to_nifti,
     load_dimble,
     nifti_to_dimble,
-    create_temp_dir,
+    _create_temp_dir,
 )
 
 __all__ = [
@@ -13,4 +13,5 @@ __all__ = [
     "load_dimble",
     "nifti_to_dimble",
     "dimble_to_nifti",
+    "_create_temp_dir"
 ]
