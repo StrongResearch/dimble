@@ -175,14 +175,12 @@ pub fn load_pixel_array(
         })?,
         // .expect("safetensors object should have 8 byte header",
     ) as usize;
-    println!("header_len: {}", header_len);
     let metadata: HashMetadata =
         serde_json::from_slice(&buffer[8..8 + header_len]).map_err(|e| {
             DimbleError::new_err(format!(
                 "safetensors object should have valid json header: {e:?}"
             ))
         })?;
-    // println!("metadata: {:#?}", metadata);
     let arr_info = metadata
         .tensors
         .get("pixel_array")
@@ -304,12 +302,6 @@ fn header_fields_and_buffer_to_pydict(
 
                 let field_pos = *field_pos as usize + header_len + 8;
                 let field_length = *field_length as usize;
-                println!(
-                    "field: {field}, field_pos: {field_pos}, field_length: {field_length}",
-                    field = field,
-                    field_pos = field_pos,
-                    field_length = field_length
-                );
 
                 match field {
                     "7FE00010" => {
@@ -644,7 +636,6 @@ mod tests {
         use serde_json::Value;
         let recon_json: Value =
             serde_json::from_reader(recon_json_reader).expect("should be able to read json");
-        println!("{}", recon_json);
         assert_eq!(recon_json["00080008"]["vr"], "PN");
         assert_eq!(recon_json["00080008"]["Value"], Value::Null);
     }
