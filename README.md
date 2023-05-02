@@ -20,6 +20,9 @@ Bindings for Python and conversion to NumPy/CuPy/JAX/Torch tensors
 Safe: no codegen/exec based on the metadata
 - Done
 
+Support for ITK file formats [[ref](https://simpleitk.readthedocs.io/en/v1.2.4/Documentation/docs/source/IO.html#images)], including NIfTI
+- Done
+
 
 ## Installation
 

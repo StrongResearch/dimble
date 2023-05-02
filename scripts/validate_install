@@ -1,24 +1,28 @@
 #!/usr/bin/env python
 
 import os
+import tempfile
+import urllib.request
 from pathlib import Path
 
 import pydicom
+import SimpleITK as sitk
 import torch
 
 import dimble
 
 
 def main():
+    temp_dir = dimble._create_temp_dir()
     print("downloading demo DICOM file")
     path = "https://github.com/pydicom/pydicom-data/blob/master/data_store/data/JPEG-LL.dcm?raw=true"
-    local_path = Path("/tmp/JPEG-LL.dcm")
+    local_path = temp_dir / "JPEG-LL.dcm"
     if not local_path.exists():
-        os.system(f"wget {path} -O {local_path} -q")
+        urllib.request.urlretrieve(path, local_path)
     print("OK")
 
     print("converting to dimble")
-    dimble_file = Path("/tmp/JPEG-LL.dimble")
+    dimble_file = temp_dir / "JPEG-LL.dimble"
     dimble_file.unlink(missing_ok=True)
     dimble.dicom_to_dimble(local_path, dimble_file)
     print("OK")
@@ -30,12 +34,43 @@ def main():
     print("OK")
 
     print("converting back to DICOM")
-    recon_path = Path("/tmp/JPEG-LL.recon.dcm")
+    recon_path = temp_dir / "JPEG-LL.recon.dcm"
     recon_path.unlink(missing_ok=True)
     dimble.dimble_to_dicom(dimble_file, recon_path)
     assert recon_path.exists()
     ds = pydicom.dcmread(recon_path)
     print("OK")
+
+    print("downloading demo NIfTI file")
+    path = "https://nifti.nimh.nih.gov/nifti-1/data/zstat1.nii.gz"
+    local_path = temp_dir / "input.nii.gz"
+    if not local_path.exists():
+        urllib.request.urlretrieve(path, local_path)
+    print("OK")
+
+    print("converting to dimble")
+    dimble_file = temp_dir / "input.dimble"
+    dimble_file.unlink(missing_ok=True)
+    dimble.nifti_to_dimble(local_path, dimble_file)
+    print("OK")
+
+    print("loading dimble")
+    dimble_ds = dimble.load_dimble(dimble_file, ["7FE00010"])
+    assert torch.is_tensor(dimble_ds["7FE00010"])
+    print("OK")
+
+    print("converting back to NIfTI")
+    recon_path = temp_dir / "input.recon.nii.gz"
+    recon_path.unlink(missing_ok=True)
+    dimble.dimble_to_nifti(dimble_file, recon_path)
+    assert recon_path.exists()
+    input_image = sitk.ReadImage(local_path.as_posix())
+    recon_image = sitk.ReadImage(recon_path.as_posix())
+    input_image_array = sitk.GetArrayFromImage(input_image)
+    recon_image_array = sitk.GetArrayFromImage(recon_image)
+    assert (input_image_array == recon_image_array).all(), "Reconstructed image does not match input image"
+    print("OK")
+
 
     print()
     print("Installation successful!")

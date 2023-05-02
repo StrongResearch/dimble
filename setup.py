@@ -15,6 +15,7 @@ setup(
         "plac",
         "msgpack",
         "python-gdcm",
+        "SimpleITK",
     ],
     extras_require={"dev": ["black", "flake8", "isort", "pytest"]},
     tests_require=["pytest"],
