@@ -22,6 +22,7 @@ jobs:
       
       - name: Install dependencies 
         run : | 
+          pip install maturin
           pip install . -v
       - name: Build 
         run : | 

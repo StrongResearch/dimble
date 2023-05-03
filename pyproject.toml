@@ -11,7 +11,7 @@ dependencies = [
     "plac",
     "msgpack",
     "python-gdcm",
-    "SimpleITK",
+    "SimpleITK"
 ]
 
 [build-system]
