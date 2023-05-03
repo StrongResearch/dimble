@@ -1,12 +1,16 @@
-from typing import Optional
-from pathlib import Path
-import dimble
-from tqdm import tqdm
-import pydicom
+# ruff: noqa: E501
 import time
+from pathlib import Path
+from typing import Optional
+
 import numpy as np
-import torch
 import plac
+import pydicom
+import torch
+from tqdm import tqdm
+
+import dimble
+
 
 def dimble_loading(dimble_files, cuda=False, verbose=True):
     for file in tqdm(dimble_files, desc="DIMBLE", disable=not verbose):
@@ -14,12 +18,14 @@ def dimble_loading(dimble_files, cuda=False, verbose=True):
         if cuda:
             data = data["7FE00010"].cuda()
 
+
 def dicom_loading(dicom_files, cuda=False, verbose=True):
     for file in tqdm(dicom_files, desc="DICOM", disable=not verbose):
         data = pydicom.dcmread(str(file))
         data = torch.from_numpy(data.pixel_array.astype(np.int32))
         if cuda:
             data = data.cuda()
+
 
 @plac.annotations(
     dicom_dir=("Path to DICOM directory", "positional", None, Path),
@@ -32,7 +38,9 @@ def main(dicom_dir: Path, dimble_dir: Path, n: Optional[int], cuda: bool = False
         n = -1
     dicom_files = list(dicom_dir.rglob("*.dcm"))[:n]
     dimble_files = list(dimble_dir.rglob("*.dimble"))[:n]
-    assert len(dimble_files) == len(dicom_files), "Number of files in DICOM and DIMBLE directories must match"
+    assert len(dimble_files) == len(
+        dicom_files
+    ), "Number of files in DICOM and DIMBLE directories must match"
     print("Loading", len(dicom_files), "files")
 
     # warmup
@@ -56,9 +64,14 @@ def main(dicom_dir: Path, dimble_dir: Path, n: Optional[int], cuda: bool = False
 
     # RESULTS
     print()
-    print(f"DICOM loaded {len(dicom_files)} files in {dicom_elapsed:.2f} seconds, {len(dicom_files)/dicom_elapsed:.2f} images/second")
-    print(f"DIMBLE loaded {len(dimble_files)} files in {dimble_elapsed:.2f} seconds, {len(dimble_files)/dimble_elapsed:.2f} images/second")
+    print(
+        f"DICOM loaded {len(dicom_files)} files in {dicom_elapsed:.2f} seconds, {len(dicom_files)/dicom_elapsed:.2f} images/second"
+    )
+    print(
+        f"DIMBLE loaded {len(dimble_files)} files in {dimble_elapsed:.2f} seconds, {len(dimble_files)/dimble_elapsed:.2f} images/second"
+    )
     print(f"DIMBLE is {dicom_elapsed/dimble_elapsed:.2f}x faster than DICOM")
+
 
 if __name__ == "__main__":
     plac.call(main)

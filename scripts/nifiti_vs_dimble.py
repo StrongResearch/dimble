@@ -1,19 +1,23 @@
-from typing import Optional
-from pathlib import Path
-import dimble
-from tqdm import tqdm
-import SimpleITK as sitk
+# ruff: noqa: E501
 import time
+from pathlib import Path
+from typing import Optional
+
 import numpy as np
-import torch
 import plac
+import SimpleITK as sitk
+import torch
+from tqdm import tqdm
+
+import dimble
+
 
 def dimble_loading(dimble_files, cuda=False, verbose=True):
     for file in tqdm(dimble_files, desc="DIMBLE", disable=not verbose):
         data = dimble.load_dimble(file, ["7FE00010"])
         if cuda:
             data = data["7FE00010"].cuda()
-        
+
 
 def nifti_loading(nifti_files, cuda=False, verbose=True):
     for file in tqdm(nifti_files, desc="NIFTI", disable=not verbose):
@@ -23,6 +27,7 @@ def nifti_loading(nifti_files, cuda=False, verbose=True):
         if cuda:
             data = data.cuda()
 
+
 @plac.annotations(
     nifti_dir=("Path to NIFTI directory", "positional", None, Path),
     dimble_dir=("Path to DIMBLE directory", "positional", None, Path),
@@ -31,10 +36,12 @@ def nifti_loading(nifti_files, cuda=False, verbose=True):
 )
 def main(nifti_dir: Path, dimble_dir: Path, n: Optional[int], cuda: bool = False):
     if n is None:
-        n = -1 # load all
+        n = -1  # load all
     nifti_files = list(nifti_dir.rglob("*.nii.gz"))[:n]
     dimble_files = list(dimble_dir.rglob("*.dimble"))[:n]
-    assert len(dimble_files) == len(nifti_files), "Number of files in NIFTI and DIMBLE directories must match"
+    assert len(dimble_files) == len(
+        nifti_files
+    ), "Number of files in NIFTI and DIMBLE directories must match"
     print("Loading", len(nifti_files), "files")
 
     # warmup
@@ -58,9 +65,14 @@ def main(nifti_dir: Path, dimble_dir: Path, n: Optional[int], cuda: bool = False
 
     # RESULTS
     print()
-    print(f"NIFTI loaded {len(nifti_files)} files in {nifti_elapsed:.4f} seconds, {len(nifti_files)/nifti_elapsed:.2f} images/second")
-    print(f"DIMBLE loaded {len(dimble_files)} files in {dimble_elapsed:.4f} seconds, {len(dimble_files)/dimble_elapsed:.2f} images/second")
+    print(
+        f"NIFTI loaded {len(nifti_files)} files in {nifti_elapsed:.4f} seconds, {len(nifti_files)/nifti_elapsed:.2f} images/second"
+    )
+    print(
+        f"DIMBLE loaded {len(dimble_files)} files in {dimble_elapsed:.4f} seconds, {len(dimble_files)/dimble_elapsed:.2f} images/second"
+    )
     print(f"Speedup: {nifti_elapsed/dimble_elapsed:.2f}x")
+
 
 if __name__ == "__main__":
     plac.call(main)
