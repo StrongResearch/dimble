@@ -22,11 +22,10 @@ jobs:
       
       - name: Install dependencies 
         run : | 
-          python -m pip install poetry
-          poetry install  
+          pip install . -v
       - name: Build 
         run : | 
-          poetry build
+          maturin build
       - uses: actions/upload-artifact@v3
         with:
-          path: ./dist/*.whl
+          path: target/wheels/*.whl

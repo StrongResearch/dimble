@@ -1,6 +1,22 @@
+[project]
+name = "dimble"
+version = "0.1.0"
+description = "Nimble Digital Imaging for Medicine"
+classifiers = ["Programming Language :: Python"]
+dependencies = [
+    "torch>=1.10",
+    "numpy",
+    "safetensors",
+    "pydicom",
+    "plac",
+    "msgpack",
+    "python-gdcm",
+    "SimpleITK",
+]
+
 [build-system]
-requires = ["setuptools", "wheel", "setuptools-rust"]
-build-backend = "setuptools.build_meta"
+requires = ["maturin>=0.14,<0.15"]
+build-backend = "maturin"
 
 [tool.pytest.ini_options]
 testpaths = [
