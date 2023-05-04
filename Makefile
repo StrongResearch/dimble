@@ -14,7 +14,10 @@ prep_test:
 
 test: prep_test
 	cargo test
-	pytest
+	pytest --benchmark-disable
+
+bench: prep_test
+	pytest --benchmark-enable --benchmark-group-by=fullfunc
 
 fmt:
 	cargo fmt
