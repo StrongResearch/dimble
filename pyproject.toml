@@ -11,7 +11,15 @@ dependencies = [
     "plac",
     "msgpack",
     "python-gdcm",
-    "SimpleITK"
+    "SimpleITK",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=7.3.1", 
+     "flake8", 
+     "isort", 
+     "pytest"
 ]
 
 [build-system]
