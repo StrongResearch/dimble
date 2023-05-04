@@ -1,5 +1,7 @@
 # dimble
 
+[![Build](https://github.com/StrongResearch/dimble/actions/workflows/build.yml/badge.svg)](https://github.com/StrongResearch/dimble/actions/workflows/build.yml)
+
 Nimble Digital Imaging for Medicine
 
 Near lossless and easy conversion from DICOM and back
