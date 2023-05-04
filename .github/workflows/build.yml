@@ -30,6 +30,7 @@ jobs:
       - name: Test 
         run : | 
           pip install -v .[dev] 
+          make prep_test
           python3 -m pytest
       - uses: actions/upload-artifact@v3
         with:
