@@ -19,6 +19,9 @@ test: prep_test
 bench: prep_test
 	pytest --benchmark-enable --benchmark-group-by=fullfunc
 
+bench-pydicom-vs-sitk:
+	pytest test/pydicom_comparisons.py --benchmark-group-by=param -s --benchmark-save=pydicom_comparisons
+
 fmt:
 	cargo fmt
 	isort .
