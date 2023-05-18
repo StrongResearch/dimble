@@ -5,7 +5,9 @@ from .dimble import (
     dimble_to_nifti,
     load_dimble,
     nifti_to_dimble,
+    rglob_dicom
 )
+rglob_dicom
 
 __all__ = [
     "dicom_to_dimble",
@@ -14,4 +16,5 @@ __all__ = [
     "nifti_to_dimble",
     "dimble_to_nifti",
     "_create_temp_dir",
+    "rglob_dicom"
 ]

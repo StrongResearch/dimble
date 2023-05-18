@@ -133,3 +133,7 @@ def dimble_to_nifti(dimble_path: Path, output_path: Path) -> None:
         sitk.WriteImage(itk_image, output_path)
     finally:
         ir_path.unlink(missing_ok=True)
+
+def rglob_dicom(path: Path) -> list[Path]:
+    dicom_extensions = [".dcm", ".dicom", ".DCM", ".DICOM"]
+    return [p for p in path.rglob("*") if p.suffix in dicom_extensions]
