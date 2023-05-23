@@ -255,7 +255,7 @@ fn header_fields_and_buffer_to_pydict(
     let dataset = PyDict::new(py);
     let fields = fields.unwrap_or_else(|| header.keys().map(|k| k.as_str()).collect());
     for field in fields {
-        match header.get(field) {
+        let py_field = match header.get(field) {
             Some(HeaderField::Deffered(field_pos, field_length, _vr)) => {
                 // return the field value
 
@@ -264,29 +264,15 @@ fn header_fields_and_buffer_to_pydict(
 
                 match field {
                     "7FE00010" => {
-                        let tensor = load_pixel_array(
-                            filename,
-                            field_pos,
-                            field_length,
-                            device,
-                            slices.clone(),
-                        )?;
-                        dataset
-                            .set_item("7FE00010", tensor)
-                            .expect("inserting should work");
+                        load_pixel_array(filename, field_pos, field_length, device, slices.clone())?
                     }
-                    _ => {
-                        let py_field = get_field(py, dimble_buffer, field_pos, field_length);
-                        dataset
-                            .set_item(field, py_field)
-                            .expect("inserting should work");
-                    }
+                    _ => get_field(py, dimble_buffer, field_pos, field_length),
                 }
             }
             Some(HeaderField::SQ(sq)) => {
                 // return all fields of the sequence (In the future we might support lazy loading of sequence items)
                 let sq = sq.first().expect("sq should have at least one item");
-                let sq_dict = header_fields_and_buffer_to_pydict(
+                header_fields_and_buffer_to_pydict(
                     py,
                     sq,
                     header_len,
@@ -296,19 +282,15 @@ fn header_fields_and_buffer_to_pydict(
                     device,
                     slices,
                 )
-                .unwrap();
-                dataset
-                    .set_item(field, sq_dict)
-                    .expect("inserting should work");
+                .unwrap()
             }
-            Some(HeaderField::Empty(_vr)) => {
-                // return None
-                dataset
-                    .set_item(field, py.None())
-                    .expect("inserting should work");
-            }
+            Some(HeaderField::Empty(_vr)) => py.None(),
             None => panic!("field {field} not found for header {header:?}"),
-        }
+        };
+
+        dataset
+            .set_item(field, py_field)
+            .expect("inserting should work");
     }
     Ok(dataset.into_py(py))
 }
