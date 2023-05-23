@@ -177,19 +177,21 @@ fn prepare_dicom_fields_for_serialisation(
 }
 
 fn serialise_dimble_fields(header_fields: HeaderFieldMap, data_bytes: Vec<u8>, dimble_path: &str) {
+    const HEADER_LENGTH_LENGTH: u64 = std::mem::size_of::<u64>() as u64;
+
     let mut file = fs::File::create(dimble_path).unwrap();
-    let mut file_copy = file.try_clone().unwrap(); //  copy this because rust complains about borrowing file twice
-    file.seek(SeekFrom::Start(8)).unwrap(); // move 8 bytes forward to make room for header length (u64)
-    let mut serialiser = Serializer::new(file).with_struct_map();
+    file.seek(SeekFrom::Start(HEADER_LENGTH_LENGTH)).unwrap(); // leave room for header length field
 
+    let mut serialiser = Serializer::new(&file).with_struct_map();
     header_fields.serialize(&mut serialiser).unwrap();
-    let header_len: u64 = file_copy.stream_position().unwrap() - 8; // (u64) TODO maybe make a less magical number
-    file_copy.seek(SeekFrom::Start(0)).unwrap();
-    file_copy.write_all(&header_len.to_le_bytes()).unwrap();
-    file_copy.seek(SeekFrom::Start(8 + header_len)).unwrap();
 
-    let mut inner = serialiser.into_inner();
-    inner.write_all(&data_bytes).unwrap();
+    let end_of_headers = file.stream_position().unwrap();
+    let header_len = end_of_headers - HEADER_LENGTH_LENGTH;
+    file.seek(SeekFrom::Start(0)).unwrap();
+    file.write_all(&header_len.to_le_bytes()).unwrap();
+    file.seek(SeekFrom::Start(end_of_headers)).unwrap();
+
+    file.write_all(&data_bytes).unwrap();
 }
 
 pub fn dicom_json_to_dimble(
