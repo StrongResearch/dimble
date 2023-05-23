@@ -297,24 +297,19 @@ fn header_fields_and_buffer_to_pydict(
 
 fn deserialise_dimble_header(buffer: &[u8]) -> Result<(HeaderFieldMap, usize), DimbleError> {
     // TODO better error handling, this is a mess
-    let header_len = u64::from_le_bytes(
-        buffer[0..8]
-            .try_into()
-            .map_err(|e| {
-                DimbleError::new_err(format!(
-                    "safetensors object should have 8 byte header len: {e:?}"
-                ))
-            })
-            .expect("file should have 8 byte header"),
-    ) as usize;
 
-    let header: HeaderFieldMap = rmp_serde::from_slice(&buffer[8..8 + header_len])
-        .map_err(|e| {
-            DimbleError::new_err(format!(
-                "safetensors object should have valid header: {e:?}"
-            ))
-        })
-        .expect("file should have valid header");
+    assert!(
+        buffer.len() >= 8,
+        "file should have 8 byte header, is only {}",
+        buffer.len(),
+    );
+    // TODO: `split_array_ref` when stable
+    let (header_len, buffer) = buffer.split_at(8);
+    let header_len = u64::from_le_bytes(header_len.try_into().unwrap()) as usize;
+
+    let header = &buffer[..header_len];
+    let header =
+        rmp_serde::from_slice(header).expect("safetensors object should have valid header");
 
     Ok((header, header_len))
 }
