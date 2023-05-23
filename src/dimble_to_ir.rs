@@ -10,14 +10,11 @@ fn headerfield_and_bytes_to_dicom_fields(
     dimble_buffer: &[u8],
 ) -> DicomField {
     match header_field {
-        HeaderField::Empty(vr) => {
-            let vr = String::from_utf8(vr.to_vec()).unwrap();
-            DicomField {
-                value: None,
-                vr,
-                inline_binary: None,
-            }
-        }
+        HeaderField::Empty(vr) => DicomField {
+            value: None,
+            vr: *vr,
+            inline_binary: None,
+        },
         HeaderField::SQ(sqs) => {
             let seq_fields = sqs
                 .iter()
@@ -34,18 +31,17 @@ fn headerfield_and_bytes_to_dicom_fields(
 
             DicomField {
                 value: Some(seq_fields),
-                vr: "SQ".to_string(),
+                vr: *b"SQ",
                 inline_binary: None,
             }
         }
         HeaderField::Deffered(field_pos, field_length, vr) => {
-            let vr = String::from_utf8(vr.to_vec()).expect("expected vr to be utf8");
             // inline_binary VRs are OB and OW. TODO support the other inline binary VRs
             let field_pos: usize = (*field_pos as usize) + 8;
             let field_length = *field_length as usize;
             let field_bytes = &dimble_buffer[field_pos..field_pos + field_length];
-            let dicom_field: DicomField = match vr.as_str() {
-                "OB" | "OW" => {
+            let dicom_field: DicomField = match vr {
+                b"OB" | b"OW" => {
                     let inline_binary: String = match tag {
                         "7FE00010" => {
                             // Pixel Data
@@ -60,11 +56,11 @@ fn headerfield_and_bytes_to_dicom_fields(
 
                     DicomField {
                         value: None,
-                        vr,
+                        vr: *vr,
                         inline_binary: Some(inline_binary),
                     }
                 }
-                "PN" => {
+                b"PN" => {
                     let mut cursor = field_bytes;
                     let v = decode::read_value(&mut cursor).unwrap();
                     let name = match v {
@@ -74,7 +70,7 @@ fn headerfield_and_bytes_to_dicom_fields(
                     let a = DicomValue::Alphabetic(Alphabetic { alphabetic: name });
                     DicomField {
                         value: Some(vec![a]),
-                        vr,
+                        vr: *vr,
                         inline_binary: None,
                     }
                 }
@@ -123,7 +119,7 @@ fn headerfield_and_bytes_to_dicom_fields(
                     };
                     DicomField {
                         value: Some(value),
-                        vr,
+                        vr: *vr,
                         inline_binary: None,
                     }
                 }

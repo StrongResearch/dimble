@@ -8,7 +8,7 @@ use crate::dicom_json::*;
 use std::io::prelude::*;
 use std::io::SeekFrom;
 
-type VR = [u8; 2]; // TODO use newtype pattern?
+pub(crate) type VR = [u8; 2]; // TODO use newtype pattern?
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum HeaderField {
@@ -109,7 +109,7 @@ fn prepare_dimble_field(
             inline_binary: None,
         } => {
             match value.as_slice() {
-                [] if vr == "SQ" => HeaderField::SQ(vec![]),
+                [] if vr == b"SQ" => HeaderField::SQ(vec![]),
                 [] => panic!("empty value"),
                 [DicomValue::SeqField(seq)] => {
                     let sq_header_field_map =
@@ -119,13 +119,10 @@ fn prepare_dimble_field(
                 dicom_values => {
                     // call a function to handle this
                     match dicom_values_to_vec(tag, dicom_values) {
-                        Some(field_bytes) => {
-                            let vr = vr.as_bytes().try_into().unwrap();
-                            extend_and_make_field(data_bytes, &field_bytes, vr)
-                        }
+                        Some(field_bytes) => extend_and_make_field(data_bytes, &field_bytes, *vr),
                         None => {
                             // TODO this is kind of a hack for gracefully not handling sequences of sequences
-                            HeaderField::Empty(vr.as_bytes().try_into().unwrap())
+                            HeaderField::Empty(*vr)
                         }
                     }
                 }
@@ -135,7 +132,7 @@ fn prepare_dimble_field(
             value: None,
             vr,
             inline_binary: None,
-        } => HeaderField::Empty(vr.as_bytes().try_into().unwrap()),
+        } => HeaderField::Empty(*vr),
         DicomField {
             value: None,
             vr,
@@ -146,13 +143,11 @@ fn prepare_dimble_field(
                     pixel_array_safetensors_path.expect("expected pixel_array_safetensors_path"),
                 );
                 // data_bytes.extend(field_bytes);
-                let vr = vr.as_bytes().try_into().unwrap();
-                extend_and_make_field(data_bytes, &field_bytes, vr)
+                extend_and_make_field(data_bytes, &field_bytes, *vr)
             }
             _ => {
                 let field_bytes = to_vec(&inline_binary).unwrap();
-                let vr = vr.as_bytes().try_into().unwrap();
-                extend_and_make_field(data_bytes, &field_bytes, vr)
+                extend_and_make_field(data_bytes, &field_bytes, *vr)
             }
         },
         DicomField {
@@ -253,7 +248,7 @@ mod tests {
         let ir = deserialise_ir(ir_data.as_bytes());
         {
             let field = ir.get("00080005").expect("expected 00080005 to exist");
-            assert_eq!(field.vr, "CS");
+            assert_eq!(field.vr, *b"CS");
             let value: Vec<String> = field
                 .value
                 .iter()
@@ -266,7 +261,7 @@ mod tests {
         }
         {
             let field = ir.get("00080008").expect("expected 00080008 to exist");
-            assert_eq!(field.vr, "CS");
+            assert_eq!(field.vr, *b"CS");
             let value: Vec<String> = field
                 .value
                 .as_ref()
@@ -288,12 +283,12 @@ mod tests {
         }
         {
             let field = ir.get("00080090").expect("expected 00080090 to exist");
-            assert_eq!(field.vr, "PN");
+            assert_eq!(field.vr, *b"PN");
             assert_eq!(field.value, None);
         }
         {
             let field = ir.get("00100010").expect("expected 00100010 to exist");
-            assert_eq!(field.vr, "PN");
+            assert_eq!(field.vr, *b"PN");
             let value: Vec<String> = field
                 .value
                 .as_ref()
