@@ -85,13 +85,15 @@ fn prepare_dimble_fields(
     data_bytes: &mut Vec<u8>,
     pixel_array_safetensors_path: Option<&str>,
 ) -> HeaderFieldMap {
-    let mut header_field_map: HeaderFieldMap = HeaderFieldMap::new();
-    for (tag, dicom_field) in dicom_fields.iter() {
-        let header_field: HeaderField =
-            prepare_dimble_field(tag, dicom_field, data_bytes, pixel_array_safetensors_path);
-        header_field_map.insert(tag.to_owned(), header_field);
-    }
-    header_field_map
+    dicom_fields
+        .iter()
+        .map(|(tag, dicom_field)| {
+            (
+                tag.to_owned(),
+                prepare_dimble_field(tag, dicom_field, data_bytes, pixel_array_safetensors_path),
+            )
+        })
+        .collect()
 }
 
 fn prepare_dimble_field(
