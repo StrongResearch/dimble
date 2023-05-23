@@ -27,10 +27,7 @@ fn extend_and_make_field(data_bytes: &mut Vec<u8>, field_bytes: &[u8], vr: VR) -
 pub type HeaderFieldMap = HashMap<String, HeaderField>;
 
 fn get_file_bytes(safetensors_path: &str) -> Vec<u8> {
-    let mut f = fs::File::open(safetensors_path).unwrap();
-    let mut buffer = Vec::new();
-    f.read_to_end(&mut buffer).unwrap();
-    buffer
+    fs::read(safetensors_path).unwrap()
 }
 
 fn dicom_values_to_vec(tag: &str, dicom_values: &[DicomValue]) -> Option<Vec<u8>> {
