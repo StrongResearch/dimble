@@ -47,11 +47,7 @@ fn headerfield_and_bytes_to_dicom_fields(
                             // Pixel Data
                             "TODO encode pixel data correctly".to_string()
                         }
-                        _ => {
-                            let mut cursor = field_bytes;
-                            let v = decode::read_value(&mut cursor).unwrap();
-                            v.as_str().unwrap().to_string()
-                        }
+                        _ => rmp_serde::decode::from_slice(field_bytes).unwrap(),
                     };
 
                     DicomField {
@@ -61,12 +57,7 @@ fn headerfield_and_bytes_to_dicom_fields(
                     }
                 }
                 b"PN" => {
-                    let mut cursor = field_bytes;
-                    let v = decode::read_value(&mut cursor).unwrap();
-                    let name = match v {
-                        Value::String(s) => s.into_str().unwrap(),
-                        _ => panic!("expected string"),
-                    };
+                    let name = rmp_serde::decode::from_slice(field_bytes).unwrap();
                     let a = DicomValue::Alphabetic(Alphabetic { alphabetic: name });
                     DicomField {
                         value: Some(vec![a]),
