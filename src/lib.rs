@@ -217,8 +217,8 @@ fn value_to_py(py: Python, value: Value) -> PyObject {
         Value::String(s) => s.into_str().into_py(py),
         Value::F64(f) => f.into_py(py),
         Value::Integer(i) => {
-            if i.is_i64() {
-                i.as_i64().unwrap().into_py(py)
+            if let Some(v) = i.as_i64() {
+                v.into_py(py)
             } else {
                 i.as_u64().unwrap().into_py(py)
             }
