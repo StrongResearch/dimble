@@ -1,12 +1,12 @@
 use rmp_serde::{to_vec, Serializer};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::fs;
-use std::io::{BufReader, Write};
+use std::{
+    collections::HashMap,
+    fs,
+    io::{prelude::*, BufReader, SeekFrom, Write},
+};
 
 use crate::dicom_json::*;
-use std::io::prelude::*;
-use std::io::SeekFrom;
 
 pub(crate) type VR = [u8; 2]; // TODO use newtype pattern?
 
