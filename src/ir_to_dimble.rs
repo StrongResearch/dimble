@@ -211,9 +211,7 @@ pub fn dicom_json_to_dimble(
 }
 
 fn deserialise_ir(data: impl Read) -> DicomJsonData {
-    let dicom_json: HashMap<String, DicomField> =
-        serde_json::from_reader(data).expect("Failed to parse JSON");
-    dicom_json
+    serde_json::from_reader(data).expect("Failed to parse JSON")
 }
 
 #[cfg(test)]
