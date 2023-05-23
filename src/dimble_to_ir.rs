@@ -1,7 +1,7 @@
 use crate::dicom_json::*;
 use crate::ir_to_dimble::{HeaderField, HeaderFieldMap};
 use memmap2::MmapOptions;
-use rmpv::{decode, Value};
+use rmpv::{decode, Integer, Value};
 use std::fs;
 
 fn headerfield_and_bytes_to_dicom_fields(
@@ -70,13 +70,7 @@ fn headerfield_and_bytes_to_dicom_fields(
                     let v = decode::read_value(&mut cursor).unwrap();
                     let value: Vec<DicomValue> = match v {
                         Value::String(s) => vec![DicomValue::String(s.into_str().unwrap())],
-                        Value::Integer(i) => {
-                            if i.is_i64() {
-                                vec![DicomValue::Integer(i.as_i64().unwrap())]
-                            } else {
-                                vec![DicomValue::Integer(i.as_u64().unwrap() as i64)]
-                            }
-                        }
+                        Value::Integer(i) => vec![integer_to_dicom_value(&i)],
                         Value::F64(f) => vec![DicomValue::Float(f)],
                         Value::Array(a) => {
                             let mut values = Vec::new();
@@ -85,15 +79,7 @@ fn headerfield_and_bytes_to_dicom_fields(
                                     Value::String(s) => {
                                         values.push(DicomValue::String(s.into_str().unwrap()))
                                     }
-                                    Value::Integer(i) => {
-                                        if i.is_i64() {
-                                            values.push(DicomValue::Integer(i.as_i64().unwrap()))
-                                        } else {
-                                            values.push(DicomValue::Integer(
-                                                i.as_u64().unwrap() as i64
-                                            ))
-                                        }
-                                    }
+                                    Value::Integer(i) => values.push(integer_to_dicom_value(&i)),
                                     Value::F64(f) => values.push(DicomValue::Float(f)),
                                     _ => {
                                         println!("unexpected value type: {:?}", v);
@@ -117,6 +103,16 @@ fn headerfield_and_bytes_to_dicom_fields(
             };
             dicom_field
         }
+    }
+}
+
+fn integer_to_dicom_value(i: &Integer) -> DicomValue {
+    if let Some(v) = i.as_i64() {
+        DicomValue::Integer(v)
+    } else if let Some(v) = i.as_u64() {
+        DicomValue::Integer(v as i64)
+    } else {
+        panic!("Could not represent the integer as i64 or u64")
     }
 }
 
