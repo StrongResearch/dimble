@@ -40,7 +40,7 @@ fn headerfield_and_bytes_to_dicom_fields(
             let field_pos: usize = (*field_pos as usize) + 8;
             let field_length = *field_length as usize;
             let field_bytes = &dimble_buffer[field_pos..field_pos + field_length];
-            let dicom_field: DicomField = match vr {
+            match vr {
                 b"OB" | b"OW" => {
                     let inline_binary: String = match tag {
                         "7FE00010" => {
@@ -89,8 +89,7 @@ fn headerfield_and_bytes_to_dicom_fields(
                         inline_binary: None,
                     }
                 }
-            };
-            dicom_field
+            }
         }
     }
 }
