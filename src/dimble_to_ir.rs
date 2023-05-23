@@ -72,20 +72,15 @@ fn headerfield_and_bytes_to_dicom_fields(
                         Value::String(s) => vec![DicomValue::String(s.into_str().unwrap())],
                         Value::Integer(i) => vec![integer_to_dicom_value(&i)],
                         Value::F64(f) => vec![DicomValue::Float(f)],
-                        Value::Array(a) => {
-                            let mut values = Vec::new();
-                            for v in a {
-                                match v {
-                                    Value::String(s) => {
-                                        values.push(DicomValue::String(s.into_str().unwrap()))
-                                    }
-                                    Value::Integer(i) => values.push(integer_to_dicom_value(&i)),
-                                    Value::F64(f) => values.push(DicomValue::Float(f)),
-                                    _ => panic!("unexpected value type: {v:?}"),
-                                };
-                            }
-                            values
-                        }
+                        Value::Array(a) => a
+                            .into_iter()
+                            .map(|v| match v {
+                                Value::String(s) => DicomValue::String(s.into_str().unwrap()),
+                                Value::Integer(i) => integer_to_dicom_value(&i),
+                                Value::F64(f) => DicomValue::Float(f),
+                                _ => panic!("unexpected value type: {v:?}"),
+                            })
+                            .collect(),
                         _ => panic!("unexpected value type: {v:?}"),
                     };
                     DicomField {
