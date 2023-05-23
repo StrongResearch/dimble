@@ -310,11 +310,7 @@ fn header_fields_and_buffer_to_pydict(
                     .set_item(field, py.None())
                     .expect("inserting should work");
             }
-            None => {
-                println!("field not found: {}", field);
-                println!("header: {:?}", header);
-                panic!("field not found: {}", field);
-            }
+            None => panic!("field {field} not found for header {header:?}"),
         }
     }
     Ok(dataset.into_py(py))

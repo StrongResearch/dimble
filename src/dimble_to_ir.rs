@@ -81,18 +81,12 @@ fn headerfield_and_bytes_to_dicom_fields(
                                     }
                                     Value::Integer(i) => values.push(integer_to_dicom_value(&i)),
                                     Value::F64(f) => values.push(DicomValue::Float(f)),
-                                    _ => {
-                                        println!("unexpected value type: {:?}", v);
-                                        panic!("unexpected value type")
-                                    }
+                                    _ => panic!("unexpected value type: {v:?}"),
                                 };
                             }
                             values
                         }
-                        _ => {
-                            println!("unexpected value type: {:?}", v);
-                            panic!("unexpected value type")
-                        }
+                        _ => panic!("unexpected value type: {v:?}"),
                     };
                     DicomField {
                         value: Some(value),
