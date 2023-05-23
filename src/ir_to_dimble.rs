@@ -217,7 +217,6 @@ fn deserialise_ir(data: impl Read) -> DicomJsonData {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
 
     #[test]
     fn test_ir_deserialisation() {
@@ -321,7 +320,7 @@ mod tests {
         let file_bytes = fs::read(dimble_path).unwrap();
         assert_eq!(file_bytes.last().unwrap(), &0x42);
         let header_len = u64::from_le_bytes(file_bytes[0..8].try_into().unwrap()) as usize;
-        let mut cursor = Cursor::new(&file_bytes[8..8 + header_len]);
+        let mut cursor = &file_bytes[8..8 + header_len];
 
         let _decoded = rmpv::decode::read_value(&mut cursor).unwrap();
     }

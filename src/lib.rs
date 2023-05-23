@@ -17,7 +17,6 @@ use rmpv::Value;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::Cursor;
 
 static TORCH_MODULE: GILOnceCell<Py<PyModule>> = GILOnceCell::new();
 #[pyfunction]
@@ -237,7 +236,7 @@ fn value_to_py(py: Python, value: Value) -> PyObject {
 
 fn get_field(py: Python, buffer: &[u8], field_pos: usize, field_length: usize) -> Py<PyAny> {
     let field_bytes = &buffer[field_pos..field_pos + field_length];
-    let mut cursor = Cursor::new(field_bytes);
+    let mut cursor = field_bytes;
     let field_value = read_value(&mut cursor).expect("should be valid messagepack"); // TODO better error handling
     value_to_py(py, field_value)
 }

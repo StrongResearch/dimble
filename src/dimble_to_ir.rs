@@ -3,7 +3,6 @@ use crate::ir_to_dimble::{HeaderField, HeaderFieldMap};
 use memmap2::MmapOptions;
 use rmpv::{decode, Value};
 use std::fs;
-use std::io::Cursor;
 
 fn headerfield_and_bytes_to_dicom_fields(
     tag: &str,
@@ -53,7 +52,7 @@ fn headerfield_and_bytes_to_dicom_fields(
                             "TODO encode pixel data correctly".to_string()
                         }
                         _ => {
-                            let mut cursor = Cursor::new(field_bytes);
+                            let mut cursor = field_bytes;
                             let v = decode::read_value(&mut cursor).unwrap();
                             v.as_str().unwrap().to_string()
                         }
@@ -66,7 +65,7 @@ fn headerfield_and_bytes_to_dicom_fields(
                     }
                 }
                 "PN" => {
-                    let mut cursor = Cursor::new(field_bytes);
+                    let mut cursor = field_bytes;
                     let v = decode::read_value(&mut cursor).unwrap();
                     let name = match v {
                         Value::String(s) => s.into_str().unwrap(),
@@ -80,7 +79,7 @@ fn headerfield_and_bytes_to_dicom_fields(
                     }
                 }
                 _ => {
-                    let mut cursor = Cursor::new(field_bytes);
+                    let mut cursor = field_bytes;
                     let v = decode::read_value(&mut cursor).unwrap();
                     let value: Vec<DicomValue> = match v {
                         Value::String(s) => vec![DicomValue::String(s.into_str().unwrap())],
