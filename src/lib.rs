@@ -18,6 +18,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
 
+use crate::ir_to_dimble::HEADER_LENGTH_LENGTH;
+
 static TORCH_MODULE: GILOnceCell<Py<PyModule>> = GILOnceCell::new();
 #[pyfunction]
 fn dicom_json_to_dimble(
@@ -299,12 +301,12 @@ fn deserialise_dimble_header(buffer: &[u8]) -> Result<(HeaderFieldMap, usize), D
     // TODO better error handling, this is a mess
 
     assert!(
-        buffer.len() >= 8,
-        "file should have 8 byte header, is only {}",
+        buffer.len() >= usize::from(HEADER_LENGTH_LENGTH),
+        "file should have {HEADER_LENGTH_LENGTH} byte header, is only {}",
         buffer.len(),
     );
     // TODO: `split_array_ref` when stable
-    let (header_len, buffer) = buffer.split_at(8);
+    let (header_len, buffer) = buffer.split_at(HEADER_LENGTH_LENGTH.into());
     let header_len = u64::from_le_bytes(header_len.try_into().unwrap()) as usize;
 
     let header = &buffer[..header_len];

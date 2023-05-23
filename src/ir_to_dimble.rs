@@ -173,17 +173,18 @@ fn prepare_dicom_fields_for_serialisation(
     (header_fields, data_bytes)
 }
 
-fn serialise_dimble_fields(header_fields: HeaderFieldMap, data_bytes: Vec<u8>, dimble_path: &str) {
-    const HEADER_LENGTH_LENGTH: u64 = std::mem::size_of::<u64>() as u64;
+pub(crate) const HEADER_LENGTH_LENGTH: u8 = std::mem::size_of::<u64>() as u8;
 
+fn serialise_dimble_fields(header_fields: HeaderFieldMap, data_bytes: Vec<u8>, dimble_path: &str) {
     let mut file = fs::File::create(dimble_path).unwrap();
-    file.seek(SeekFrom::Start(HEADER_LENGTH_LENGTH)).unwrap(); // leave room for header length field
+    file.seek(SeekFrom::Start(HEADER_LENGTH_LENGTH.into()))
+        .unwrap(); // leave room for header length field
 
     let mut serialiser = Serializer::new(&file).with_struct_map();
     header_fields.serialize(&mut serialiser).unwrap();
 
     let end_of_headers = file.stream_position().unwrap();
-    let header_len = end_of_headers - HEADER_LENGTH_LENGTH;
+    let header_len = end_of_headers - u64::from(HEADER_LENGTH_LENGTH);
     file.seek(SeekFrom::Start(0)).unwrap();
     file.write_all(&header_len.to_le_bytes()).unwrap();
     file.seek(SeekFrom::Start(end_of_headers)).unwrap();
