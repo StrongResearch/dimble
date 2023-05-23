@@ -253,10 +253,7 @@ fn header_fields_and_buffer_to_pydict(
     slices: &Option<Vec<&PySlice>>,
 ) -> PyResult<PyObject> {
     let dataset = PyDict::new(py);
-    let fields = match fields {
-        Some(fields) => fields,
-        None => header.keys().map(|k| k.as_str()).collect(),
-    };
+    let fields = fields.unwrap_or_else(|| header.keys().map(|k| k.as_str()).collect());
     for field in fields {
         match header.get(field) {
             Some(HeaderField::Deffered(field_pos, field_length, _vr)) => {
