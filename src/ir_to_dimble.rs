@@ -180,7 +180,7 @@ pub(crate) const HEADER_LENGTH_LENGTH: u8 = std::mem::size_of::<u64>() as u8;
 
 fn serialise_dimble_fields(
     header_fields: HeaderFieldMap,
-    data_bytes: Vec<u8>,
+    data_bytes: &[u8],
     dimble_path: &str,
 ) -> Result<(), SerialiseFieldsError> {
     use serialise_fields_error::*;
@@ -207,7 +207,7 @@ fn serialise_dimble_fields(
     file.seek(SeekFrom::Start(end_of_headers))
         .context(CouldNotSeekToEndOfHeadersSnafu)?;
 
-    file.write_all(&data_bytes).context(CouldNotWriteDataSnafu)
+    file.write_all(data_bytes).context(CouldNotWriteDataSnafu)
 }
 
 #[derive(Debug, Snafu)]
@@ -285,7 +285,7 @@ pub fn dicom_json_to_dimble(
     let (header_fields, data_bytes) =
         prepare_dicom_fields_for_serialisation(json_dicom, pixel_array_safetensors_path)?;
 
-    serialise_dimble_fields(header_fields, data_bytes, dimble_path)
+    serialise_dimble_fields(header_fields, &data_bytes, dimble_path)
         .context(SerialiseFieldsSnafu)?;
 
     Ok(())
@@ -337,37 +337,30 @@ mod tests {
         {
             let field = ir.get("00080005").expect("expected 00080005 to exist");
             assert_eq!(field.vr, *b"CS");
-            let value: Vec<String> = field
+            let value: Vec<_> = field
                 .value
                 .iter()
                 .map(|v| match v.as_slice() {
-                    [DicomValue::String(s)] => s.to_owned(),
+                    [DicomValue::String(s)] => s,
                     _ => panic!("expected only strings"),
                 })
                 .collect();
-            assert_eq!(value, vec!["ISO_IR 100".to_owned()])
+            assert_eq!(value, ["ISO_IR 100"])
         }
         {
             let field = ir.get("00080008").expect("expected 00080008 to exist");
             assert_eq!(field.vr, *b"CS");
-            let value: Vec<String> = field
+            let value: Vec<_> = field
                 .value
                 .as_ref()
                 .unwrap()
                 .iter()
                 .map(|v| match v {
-                    DicomValue::String(s) => s.to_owned(),
+                    DicomValue::String(s) => s,
                     _ => panic!("expected only strings"),
                 })
                 .collect();
-            assert_eq!(
-                value,
-                vec![
-                    "ORIGINAL".to_owned(),
-                    "PRIMARY".to_owned(),
-                    "OTHER".to_owned()
-                ]
-            )
+            assert_eq!(value, ["ORIGINAL", "PRIMARY", "OTHER"]);
         }
         {
             let field = ir.get("00080090").expect("expected 00080090 to exist");
@@ -377,17 +370,17 @@ mod tests {
         {
             let field = ir.get("00100010").expect("expected 00100010 to exist");
             assert_eq!(field.vr, *b"PN");
-            let value: Vec<String> = field
+            let value: Vec<_> = field
                 .value
                 .as_ref()
                 .unwrap()
                 .iter()
                 .map(|v| match v {
-                    DicomValue::Alphabetic(a) => a.alphabetic.to_owned(),
+                    DicomValue::Alphabetic(a) => &a.alphabetic,
                     _ => panic!("expected only alphabetic"),
                 })
                 .collect();
-            assert_eq!(value, vec!["Doe^John".to_owned()])
+            assert_eq!(value, ["Doe^John"])
         }
 
         Ok(())
@@ -398,9 +391,9 @@ mod tests {
         let mut header_fields = HeaderFieldMap::new();
         let vr = b"CS";
         header_fields.insert("0008005".to_string(), HeaderField::Deffered(0, 1, *vr));
-        let data_bytes = vec![0x42];
+        let data_bytes = [0x42];
         let dimble_path = "/tmp/test.dimble";
-        serialise_dimble_fields(header_fields, data_bytes, dimble_path)?;
+        serialise_dimble_fields(header_fields, &data_bytes, dimble_path)?;
 
         let file_bytes = fs::read(dimble_path).unwrap();
         assert_eq!(file_bytes.last().unwrap(), &0x42);
