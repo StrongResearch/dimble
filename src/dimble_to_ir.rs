@@ -19,9 +19,9 @@ fn headerfield_and_bytes_to_dicom_fields(
             let seq_fields = sqs
                 .iter()
                 .map(|sq| {
-                    let mut sq_data: DicomJsonData = DicomJsonData::new();
+                    let mut sq_data = DicomJsonData::new();
                     for (tag, header_field) in sq.iter() {
-                        let field: DicomField =
+                        let field =
                             headerfield_and_bytes_to_dicom_fields(tag, header_field, dimble_buffer);
                         sq_data.insert(tag.to_string(), field);
                     }
@@ -37,12 +37,12 @@ fn headerfield_and_bytes_to_dicom_fields(
         }
         HeaderField::Deffered(field_pos, field_length, vr) => {
             // inline_binary VRs are OB and OW. TODO support the other inline binary VRs
-            let field_pos: usize = (*field_pos as usize) + 8;
+            let field_pos = (*field_pos as usize) + 8;
             let field_length = *field_length as usize;
             let field_bytes = &dimble_buffer[field_pos..field_pos + field_length];
             match vr {
                 b"OB" | b"OW" => {
-                    let inline_binary: String = match tag {
+                    let inline_binary = match tag {
                         "7FE00010" => {
                             // Pixel Data
                             "TODO encode pixel data correctly".to_string()
@@ -68,7 +68,7 @@ fn headerfield_and_bytes_to_dicom_fields(
                 _ => {
                     let mut cursor = field_bytes;
                     let v = decode::read_value(&mut cursor).unwrap();
-                    let value: Vec<DicomValue> = match v {
+                    let value: Vec<_> = match v {
                         Value::String(s) => vec![DicomValue::String(s.into_str().unwrap())],
                         Value::Integer(i) => vec![integer_to_dicom_value(&i)],
                         Value::F64(f) => vec![DicomValue::Float(f)],
@@ -113,7 +113,7 @@ pub fn dimble_to_dicom_json(dimble_path: &str, json_path: &str) {
     let mut json_dicom = DicomJsonData::new();
 
     for (tag, header_field) in header.iter() {
-        let field: DicomField =
+        let field =
             headerfield_and_bytes_to_dicom_fields(tag, header_field, &dimble_buffer[header_len..]);
         json_dicom.insert(tag.to_string(), field);
     }
@@ -124,7 +124,7 @@ pub fn dimble_to_dicom_json(dimble_path: &str, json_path: &str) {
 
 fn deserialise_header(buffer: &[u8]) -> (HeaderFieldMap, usize) {
     let header_len = u64::from_le_bytes(buffer[0..8].try_into().unwrap()) as usize;
-    let header: HeaderFieldMap =
+    let header =
         rmp_serde::from_slice(&buffer[8..8 + header_len]).expect("failed to deserialise header");
     (header, header_len)
 }

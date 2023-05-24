@@ -165,7 +165,7 @@ fn prepare_dicom_fields_for_serialisation(
     dicom_json_data: DicomJsonData,
     pixel_array_safetensors_path: Option<&str>,
 ) -> InnerResult<(HeaderFieldMap, Vec<u8>)> {
-    let mut data_bytes: Vec<u8> = Vec::new();
+    let mut data_bytes = Vec::new();
 
     let header_fields = prepare_dimble_fields(
         &dicom_json_data,
