@@ -26,8 +26,9 @@ fn dicom_json_to_dimble(
     json_path: &str,
     dimble_path: &str,
     pixel_array_safetensors_path: Option<&str>,
-) {
-    ir_to_dimble::dicom_json_to_dimble(json_path, pixel_array_safetensors_path, dimble_path);
+) -> PyResult<()> {
+    ir_to_dimble::dicom_json_to_dimble(json_path, pixel_array_safetensors_path, dimble_path)
+        .map_err(Into::into)
 }
 
 #[pyfunction]
@@ -355,6 +356,12 @@ pyo3::create_exception!(
     "Custom Python Exception for Dimble errors."
 );
 
+impl From<ir_to_dimble::Error> for PyErr {
+    fn from(value: ir_to_dimble::Error) -> Self {
+        DimbleError::new_err(snafu::Report::from_error(value).to_string())
+    }
+}
+
 #[pymodule]
 fn dimble_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(dicom_json_to_dimble))?;
@@ -369,6 +376,8 @@ fn dimble_rs(py: Python, m: &PyModule) -> PyResult<()> {
 mod tests {
     use super::*;
     use std::fs;
+
+    type Result<T = (), E = Box<dyn std::error::Error>> = std::result::Result<T, E>;
 
     #[test]
     fn test_load_pixel_array_safetensors() {
@@ -405,7 +414,7 @@ mod tests {
     }
 
     #[test]
-    fn test_integration_single_string() {
+    fn test_integration_single_string() -> Result {
         let dicom_json_text = r#"
         {
             "00080005": {
@@ -422,7 +431,7 @@ mod tests {
 
         fs::write(ir_path, dicom_json_text).expect("should be able to write to file");
 
-        dicom_json_to_dimble(ir_path, dimble_path, None);
+        dicom_json_to_dimble(ir_path, dimble_path, None)?;
 
         dimble_to_dicom_json(dimble_path, ir_recon_path);
 
@@ -432,10 +441,12 @@ mod tests {
             serde_json::from_reader(recon_json_reader).expect("should be able to read json");
         assert_eq!(recon_json["00080005"]["Value"][0], "ISO_IR 100");
         assert_eq!(recon_json["00080005"]["vr"], "CS");
+
+        Ok(())
     }
 
     #[test]
-    fn test_integration_string_array() {
+    fn test_integration_string_array() -> Result {
         let dicom_json_text = r#"
         {
             "00080008": {
@@ -454,7 +465,7 @@ mod tests {
 
         fs::write(ir_path, dicom_json_text).expect("should be able to write to file");
 
-        dicom_json_to_dimble(ir_path, dimble_path, None);
+        dicom_json_to_dimble(ir_path, dimble_path, None)?;
 
         dimble_to_dicom_json(dimble_path, ir_recon_path);
 
@@ -466,10 +477,12 @@ mod tests {
         assert_eq!(recon_json["00080008"]["Value"][1], "PRIMARY");
         assert_eq!(recon_json["00080008"]["Value"][2], "OTHER");
         assert_eq!(recon_json["00080008"]["vr"], "CS");
+
+        Ok(())
     }
 
     #[test]
-    fn test_integration_no_value() {
+    fn test_integration_no_value() -> Result {
         let dicom_json_text = r#"
         {
             "00080008": {
@@ -483,7 +496,7 @@ mod tests {
 
         fs::write(ir_path, dicom_json_text).expect("should be able to write to file");
 
-        dicom_json_to_dimble(ir_path, dimble_path, None);
+        dicom_json_to_dimble(ir_path, dimble_path, None)?;
 
         dimble_to_dicom_json(dimble_path, ir_recon_path);
 
@@ -493,10 +506,12 @@ mod tests {
             serde_json::from_reader(recon_json_reader).expect("should be able to read json");
         assert_eq!(recon_json["00080008"]["vr"], "PN");
         assert_eq!(recon_json["00080008"]["Value"], Value::Null);
+
+        Ok(())
     }
 
     #[test]
-    fn test_integration_inline_binary() {
+    fn test_integration_inline_binary() -> Result {
         let dicom_json_text = r#"
         {
             "00080008": {
@@ -511,7 +526,7 @@ mod tests {
 
         fs::write(ir_path, dicom_json_text).expect("should be able to write to file");
 
-        dicom_json_to_dimble(ir_path, dimble_path, None);
+        dicom_json_to_dimble(ir_path, dimble_path, None)?;
 
         dimble_to_dicom_json(dimble_path, ir_recon_path);
 
@@ -529,5 +544,7 @@ mod tests {
                 .contains_key("Value"),
             "should not have Value field"
         );
+
+        Ok(())
     }
 }

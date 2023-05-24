@@ -1,5 +1,6 @@
 use rmp_serde::{to_vec, Serializer};
 use serde::{Deserialize, Serialize};
+use snafu::prelude::*;
 use std::{
     collections::HashMap,
     fs,
@@ -84,14 +85,14 @@ fn prepare_dimble_fields(
     dicom_fields: &DicomJsonData,
     data_bytes: &mut Vec<u8>,
     pixel_array_safetensors_path: Option<&str>,
-) -> HeaderFieldMap {
+) -> InnerResult<HeaderFieldMap> {
     dicom_fields
         .iter()
         .map(|(tag, dicom_field)| {
-            (
+            Ok((
                 tag.to_owned(),
-                prepare_dimble_field(tag, dicom_field, data_bytes, pixel_array_safetensors_path),
-            )
+                prepare_dimble_field(tag, dicom_field, data_bytes, pixel_array_safetensors_path)?,
+            ))
         })
         .collect()
 }
@@ -101,7 +102,7 @@ fn prepare_dimble_field(
     dicom_field: &DicomField,
     data_bytes: &mut Vec<u8>,
     pixel_array_safetensors_path: Option<&str>,
-) -> HeaderField {
+) -> InnerResult<HeaderField> {
     match dicom_field {
         DicomField {
             value: Some(value),
@@ -109,20 +110,22 @@ fn prepare_dimble_field(
             inline_binary: None,
         } => {
             match value.as_slice() {
-                [] if vr == b"SQ" => HeaderField::SQ(vec![]),
+                [] if vr == b"SQ" => Ok(HeaderField::SQ(vec![])),
                 [] => panic!("empty value"),
                 [DicomValue::SeqField(seq)] => {
                     let sq_header_field_map =
-                        prepare_dimble_fields(seq, data_bytes, pixel_array_safetensors_path);
-                    HeaderField::SQ(vec![sq_header_field_map])
+                        prepare_dimble_fields(seq, data_bytes, pixel_array_safetensors_path)?;
+                    Ok(HeaderField::SQ(vec![sq_header_field_map]))
                 }
                 dicom_values => {
                     // call a function to handle this
                     match dicom_values_to_vec(tag, dicom_values) {
-                        Some(field_bytes) => extend_and_make_field(data_bytes, &field_bytes, *vr),
+                        Some(field_bytes) => {
+                            Ok(extend_and_make_field(data_bytes, &field_bytes, *vr))
+                        }
                         None => {
                             // TODO this is kind of a hack for gracefully not handling sequences of sequences
-                            HeaderField::Empty(*vr)
+                            Ok(HeaderField::Empty(*vr))
                         }
                     }
                 }
@@ -132,7 +135,7 @@ fn prepare_dimble_field(
             value: None,
             vr,
             inline_binary: None,
-        } => HeaderField::Empty(*vr),
+        } => Ok(HeaderField::Empty(*vr)),
         DicomField {
             value: None,
             vr,
@@ -143,79 +146,163 @@ fn prepare_dimble_field(
                     pixel_array_safetensors_path.expect("expected pixel_array_safetensors_path"),
                 );
                 // data_bytes.extend(field_bytes);
-                extend_and_make_field(data_bytes, &field_bytes, *vr)
+                Ok(extend_and_make_field(data_bytes, &field_bytes, *vr))
             }
             _ => {
                 let field_bytes = to_vec(&inline_binary).unwrap();
-                extend_and_make_field(data_bytes, &field_bytes, *vr)
+                Ok(extend_and_make_field(data_bytes, &field_bytes, *vr))
             }
         },
         DicomField {
             value: Some(_),
             vr: _vr,
             inline_binary: Some(_),
-        } => panic!("value and inline binary both present"),
+        } => ValueAndInlineBinaryBothPresentSnafu.fail(),
     }
 }
 
 fn prepare_dicom_fields_for_serialisation(
     dicom_json_data: DicomJsonData,
     pixel_array_safetensors_path: Option<&str>,
-) -> (HeaderFieldMap, Vec<u8>) {
+) -> InnerResult<(HeaderFieldMap, Vec<u8>)> {
     let mut data_bytes: Vec<u8> = Vec::new();
 
     let header_fields = prepare_dimble_fields(
         &dicom_json_data,
         &mut data_bytes,
         pixel_array_safetensors_path,
-    );
+    )?;
 
-    (header_fields, data_bytes)
+    Ok((header_fields, data_bytes))
 }
 
 pub(crate) const HEADER_LENGTH_LENGTH: u8 = std::mem::size_of::<u64>() as u8;
 
-fn serialise_dimble_fields(header_fields: HeaderFieldMap, data_bytes: Vec<u8>, dimble_path: &str) {
-    let mut file = fs::File::create(dimble_path).unwrap();
+fn serialise_dimble_fields(
+    header_fields: HeaderFieldMap,
+    data_bytes: Vec<u8>,
+    dimble_path: &str,
+) -> Result<(), SerialiseFieldsError> {
+    use serialise_fields_error::*;
+
+    let mut file =
+        fs::File::create(dimble_path).context(CouldNotCreateFileSnafu { dimble_path })?;
     file.seek(SeekFrom::Start(HEADER_LENGTH_LENGTH.into()))
-        .unwrap(); // leave room for header length field
+        .context(CouldNotSkipHeaderLengthSnafu)?;
+    // leave room for header length field
 
     let mut serialiser = Serializer::new(&file).with_struct_map();
-    header_fields.serialize(&mut serialiser).unwrap();
+    header_fields
+        .serialize(&mut serialiser)
+        .context(CouldNotSerializeHeadersSnafu)?;
 
-    let end_of_headers = file.stream_position().unwrap();
+    let end_of_headers = file
+        .stream_position()
+        .context(CouldNotQueryStreamPositionSnafu)?;
     let header_len = end_of_headers - u64::from(HEADER_LENGTH_LENGTH);
-    file.seek(SeekFrom::Start(0)).unwrap();
-    file.write_all(&header_len.to_le_bytes()).unwrap();
-    file.seek(SeekFrom::Start(end_of_headers)).unwrap();
+    file.seek(SeekFrom::Start(0))
+        .context(CouldNotSeekToStartSnafu)?;
+    file.write_all(&header_len.to_le_bytes())
+        .context(CouldNotWriteHeaderLengthSnafu)?;
+    file.seek(SeekFrom::Start(end_of_headers))
+        .context(CouldNotSeekToEndOfHeadersSnafu)?;
 
-    file.write_all(&data_bytes).unwrap();
+    file.write_all(&data_bytes).context(CouldNotWriteDataSnafu)
 }
+
+#[derive(Debug, Snafu)]
+#[snafu(module)]
+#[allow(clippy::enum_variant_names)]
+pub enum SerialiseFieldsError {
+    CouldNotCreateFile {
+        source: std::io::Error,
+        dimble_path: String,
+    },
+
+    CouldNotSkipHeaderLength {
+        source: std::io::Error,
+    },
+
+    CouldNotSerializeHeaders {
+        source: rmp_serde::encode::Error,
+    },
+
+    CouldNotQueryStreamPosition {
+        source: std::io::Error,
+    },
+
+    CouldNotSeekToStart {
+        source: std::io::Error,
+    },
+
+    CouldNotWriteHeaderLength {
+        source: std::io::Error,
+    },
+
+    CouldNotSeekToEndOfHeaders {
+        source: std::io::Error,
+    },
+
+    CouldNotWriteData {
+        source: std::io::Error,
+    },
+}
+
+#[derive(Debug, Snafu)]
+pub enum InnerError {
+    #[snafu(display("Could not open the path {json_path}"))]
+    CouldNotOpen {
+        source: std::io::Error,
+        json_path: String,
+    },
+
+    #[snafu(display("Could not parse the DICOM JSON"))]
+    FailedToParseJson { source: serde_json::Error },
+
+    #[snafu(display("DICOM data contains both a value and inline binary"))]
+    ValueAndInlineBinaryBothPresent,
+
+    #[snafu(display("Could not serialize the fields"))]
+    SerialiseFields { source: SerialiseFieldsError },
+}
+
+type InnerResult<T, E = InnerError> = std::result::Result<T, E>;
+
+#[derive(Debug, Snafu)]
+pub struct Error(InnerError);
+
+type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub fn dicom_json_to_dimble(
     json_path: &str,
     pixel_array_safetensors_path: Option<&str>,
     dimble_path: &str,
-) {
-    let json_reader = BufReader::new(fs::File::open(json_path).expect("json_path should exist"));
-    let json_dicom = deserialise_ir(json_reader);
+) -> Result<()> {
+    let file = fs::File::open(json_path).context(CouldNotOpenSnafu { json_path })?;
+    let json_reader = BufReader::new(file);
+    let json_dicom = deserialise_ir(json_reader)?;
 
     let (header_fields, data_bytes) =
-        prepare_dicom_fields_for_serialisation(json_dicom, pixel_array_safetensors_path);
+        prepare_dicom_fields_for_serialisation(json_dicom, pixel_array_safetensors_path)?;
 
-    serialise_dimble_fields(header_fields, data_bytes, dimble_path);
+    serialise_dimble_fields(header_fields, data_bytes, dimble_path)
+        .context(SerialiseFieldsSnafu)?;
+
+    Ok(())
 }
 
-fn deserialise_ir(data: impl Read) -> DicomJsonData {
-    serde_json::from_reader(data).expect("Failed to parse JSON")
+fn deserialise_ir(data: impl Read) -> InnerResult<DicomJsonData> {
+    serde_json::from_reader(data).context(FailedToParseJsonSnafu)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    type Result<T = (), E = Box<dyn std::error::Error>> = std::result::Result<T, E>;
+
     #[test]
-    fn test_ir_deserialisation() {
+    fn test_ir_deserialisation() -> Result {
         let ir_data = r#"
         {
             "00080005": {
@@ -246,7 +333,7 @@ mod tests {
         }
         "#;
 
-        let ir = deserialise_ir(ir_data.as_bytes());
+        let ir = deserialise_ir(ir_data.as_bytes())?;
         {
             let field = ir.get("00080005").expect("expected 00080005 to exist");
             assert_eq!(field.vr, *b"CS");
@@ -302,16 +389,18 @@ mod tests {
                 .collect();
             assert_eq!(value, vec!["Doe^John".to_owned()])
         }
+
+        Ok(())
     }
 
     #[test]
-    fn test_serialise_dimble_fields() {
+    fn test_serialise_dimble_fields() -> Result {
         let mut header_fields = HeaderFieldMap::new();
         let vr = b"CS";
         header_fields.insert("0008005".to_string(), HeaderField::Deffered(0, 1, *vr));
         let data_bytes = vec![0x42];
         let dimble_path = "/tmp/test.dimble";
-        serialise_dimble_fields(header_fields, data_bytes, dimble_path);
+        serialise_dimble_fields(header_fields, data_bytes, dimble_path)?;
 
         let file_bytes = fs::read(dimble_path).unwrap();
         assert_eq!(file_bytes.last().unwrap(), &0x42);
@@ -319,5 +408,7 @@ mod tests {
         let mut cursor = &file_bytes[8..8 + header_len];
 
         let _decoded = rmpv::decode::read_value(&mut cursor).unwrap();
+
+        Ok(())
     }
 }
