@@ -33,10 +33,10 @@ fn get_file_bytes(safetensors_path: &str) -> Vec<u8> {
 
 fn dicom_values_to_vec(tag: &str, dicom_values: &[DicomValue]) -> Option<Vec<u8>> {
     let field_bytes = match dicom_values {
-        [DicomValue::String(s)] => to_vec(&s).unwrap(),
-        [DicomValue::Integer(u)] => to_vec(&u).unwrap(),
-        [DicomValue::Float(u)] => to_vec(&u).unwrap(),
-        [DicomValue::Alphabetic(u)] => to_vec(&u.alphabetic).unwrap(),
+        [DicomValue::String(s)] => to_vec(&s),
+        [DicomValue::Integer(u)] => to_vec(&u),
+        [DicomValue::Float(u)] => to_vec(&u),
+        [DicomValue::Alphabetic(u)] => to_vec(&u.alphabetic),
         many => match many
             .first()
             .expect("This should definitely have a first element")
@@ -49,8 +49,7 @@ fn dicom_values_to_vec(tag: &str, dicom_values: &[DicomValue]) -> Option<Vec<u8>
                         _ => panic!("{tag} expected only strings"),
                     })
                     .collect::<Vec<String>>(),
-            )
-            .unwrap(),
+            ),
             DicomValue::Integer(_) => to_vec(
                 &many
                     .iter()
@@ -59,8 +58,7 @@ fn dicom_values_to_vec(tag: &str, dicom_values: &[DicomValue]) -> Option<Vec<u8>
                         _ => panic!("{tag} expected only ints"),
                     })
                     .collect::<Vec<i64>>(),
-            )
-            .unwrap(),
+            ),
             DicomValue::Float(_) => to_vec(
                 &many
                     .iter()
@@ -69,8 +67,7 @@ fn dicom_values_to_vec(tag: &str, dicom_values: &[DicomValue]) -> Option<Vec<u8>
                         _ => panic!("{tag} expected only floats"),
                     })
                     .collect::<Vec<f64>>(),
-            )
-            .unwrap(),
+            ),
             DicomValue::SeqField(_) => {
                 // TODO: handle sequences of sequences properly
                 return None;
@@ -78,6 +75,7 @@ fn dicom_values_to_vec(tag: &str, dicom_values: &[DicomValue]) -> Option<Vec<u8>
             other => panic!("{tag} unexpected value type {:?}", other),
         },
     };
+    let field_bytes = field_bytes.unwrap();
     Some(field_bytes)
 }
 
