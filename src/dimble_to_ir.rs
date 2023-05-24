@@ -18,15 +18,7 @@ fn headerfield_and_bytes_to_dicom_fields(
         HeaderField::SQ(sqs) => {
             let seq_fields = sqs
                 .iter()
-                .map(|sq| {
-                    let mut sq_data = DicomJsonData::new();
-                    for (tag, header_field) in sq.iter() {
-                        let field =
-                            headerfield_and_bytes_to_dicom_fields(tag, header_field, dimble_buffer);
-                        sq_data.insert(tag.to_string(), field);
-                    }
-                    DicomValue::SeqField(sq_data)
-                })
+                .map(|sq| DicomValue::SeqField(headers_to_data(sq, dimble_buffer)))
                 .collect::<Vec<_>>();
 
             DicomField {
@@ -94,6 +86,16 @@ fn headerfield_and_bytes_to_dicom_fields(
     }
 }
 
+fn headers_to_data(sq: &HeaderFieldMap, dimble_buffer: &[u8]) -> DicomJsonData {
+    sq.iter()
+        .map(|(tag, header_field)| {
+            let tag = tag.to_string();
+            let field = headerfield_and_bytes_to_dicom_fields(&tag, header_field, dimble_buffer);
+            (tag, field)
+        })
+        .collect()
+}
+
 fn integer_to_dicom_value(i: &Integer) -> DicomValue {
     if let Some(v) = i.as_i64() {
         DicomValue::Integer(v)
@@ -110,13 +112,7 @@ pub fn dimble_to_dicom_json(dimble_path: &str, json_path: &str) {
 
     let (header, header_len) = deserialise_header(&dimble_buffer);
 
-    let mut json_dicom = DicomJsonData::new();
-
-    for (tag, header_field) in header.iter() {
-        let field =
-            headerfield_and_bytes_to_dicom_fields(tag, header_field, &dimble_buffer[header_len..]);
-        json_dicom.insert(tag.to_string(), field);
-    }
+    let json_dicom = headers_to_data(&header, &dimble_buffer[header_len..]);
 
     let json_file = fs::File::create(json_path).unwrap();
     serde_json::to_writer_pretty(json_file, &json_dicom).unwrap(); // TODO don't write pretty (this is for debugging)
