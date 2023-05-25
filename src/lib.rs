@@ -17,7 +17,8 @@ use rmpv::Value;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::Cursor;
+
+use crate::ir_to_dimble::HEADER_LENGTH_LENGTH;
 
 static TORCH_MODULE: GILOnceCell<Py<PyModule>> = GILOnceCell::new();
 #[pyfunction]
@@ -25,8 +26,9 @@ fn dicom_json_to_dimble(
     json_path: &str,
     dimble_path: &str,
     pixel_array_safetensors_path: Option<&str>,
-) {
-    ir_to_dimble::dicom_json_to_dimble(json_path, pixel_array_safetensors_path, dimble_path);
+) -> PyResult<()> {
+    ir_to_dimble::dicom_json_to_dimble(json_path, pixel_array_safetensors_path, dimble_path)
+        .map_err(Into::into)
 }
 
 #[pyfunction]
@@ -218,8 +220,8 @@ fn value_to_py(py: Python, value: Value) -> PyObject {
         Value::String(s) => s.into_str().into_py(py),
         Value::F64(f) => f.into_py(py),
         Value::Integer(i) => {
-            if i.is_i64() {
-                i.as_i64().unwrap().into_py(py)
+            if let Some(v) = i.as_i64() {
+                v.into_py(py)
             } else {
                 i.as_u64().unwrap().into_py(py)
             }
@@ -237,7 +239,7 @@ fn value_to_py(py: Python, value: Value) -> PyObject {
 
 fn get_field(py: Python, buffer: &[u8], field_pos: usize, field_length: usize) -> Py<PyAny> {
     let field_bytes = &buffer[field_pos..field_pos + field_length];
-    let mut cursor = Cursor::new(field_bytes);
+    let mut cursor = field_bytes;
     let field_value = read_value(&mut cursor).expect("should be valid messagepack"); // TODO better error handling
     value_to_py(py, field_value)
 }
@@ -254,12 +256,9 @@ fn header_fields_and_buffer_to_pydict(
     slices: &Option<Vec<&PySlice>>,
 ) -> PyResult<PyObject> {
     let dataset = PyDict::new(py);
-    let fields = match fields {
-        Some(fields) => fields,
-        None => header.keys().map(|k| k.as_str()).collect(),
-    };
+    let fields = fields.unwrap_or_else(|| header.keys().map(|k| k.as_str()).collect());
     for field in fields {
-        match header.get(field) {
+        let py_field = match header.get(field) {
             Some(HeaderField::Deffered(field_pos, field_length, _vr)) => {
                 // return the field value
 
@@ -268,29 +267,15 @@ fn header_fields_and_buffer_to_pydict(
 
                 match field {
                     "7FE00010" => {
-                        let tensor = load_pixel_array(
-                            filename,
-                            field_pos,
-                            field_length,
-                            device,
-                            slices.clone(),
-                        )?;
-                        dataset
-                            .set_item("7FE00010", tensor)
-                            .expect("inserting should work");
+                        load_pixel_array(filename, field_pos, field_length, device, slices.clone())?
                     }
-                    _ => {
-                        let py_field = get_field(py, dimble_buffer, field_pos, field_length);
-                        dataset
-                            .set_item(field, py_field)
-                            .expect("inserting should work");
-                    }
+                    _ => get_field(py, dimble_buffer, field_pos, field_length),
                 }
             }
             Some(HeaderField::SQ(sq)) => {
                 // return all fields of the sequence (In the future we might support lazy loading of sequence items)
                 let sq = sq.first().expect("sq should have at least one item");
-                let sq_dict = header_fields_and_buffer_to_pydict(
+                header_fields_and_buffer_to_pydict(
                     py,
                     sq,
                     header_len,
@@ -300,47 +285,34 @@ fn header_fields_and_buffer_to_pydict(
                     device,
                     slices,
                 )
-                .unwrap();
-                dataset
-                    .set_item(field, sq_dict)
-                    .expect("inserting should work");
+                .unwrap()
             }
-            Some(HeaderField::Empty(_vr)) => {
-                // return None
-                dataset
-                    .set_item(field, py.None())
-                    .expect("inserting should work");
-            }
-            None => {
-                println!("field not found: {}", field);
-                println!("header: {:?}", header);
-                panic!("field not found: {}", field);
-            }
-        }
+            Some(HeaderField::Empty(_vr)) => py.None(),
+            None => panic!("field {field} not found for header {header:?}"),
+        };
+
+        dataset
+            .set_item(field, py_field)
+            .expect("inserting should work");
     }
     Ok(dataset.into_py(py))
 }
 
 fn deserialise_dimble_header(buffer: &[u8]) -> Result<(HeaderFieldMap, usize), DimbleError> {
     // TODO better error handling, this is a mess
-    let header_len = u64::from_le_bytes(
-        buffer[0..8]
-            .try_into()
-            .map_err(|e| {
-                DimbleError::new_err(format!(
-                    "safetensors object should have 8 byte header len: {e:?}"
-                ))
-            })
-            .expect("file should have 8 byte header"),
-    ) as usize;
 
-    let header: HeaderFieldMap = rmp_serde::from_slice(&buffer[8..8 + header_len])
-        .map_err(|e| {
-            DimbleError::new_err(format!(
-                "safetensors object should have valid header: {e:?}"
-            ))
-        })
-        .expect("file should have valid header");
+    assert!(
+        buffer.len() >= usize::from(HEADER_LENGTH_LENGTH),
+        "file should have {HEADER_LENGTH_LENGTH} byte header, is only {}",
+        buffer.len(),
+    );
+    // TODO: `split_array_ref` when stable
+    let (header_len, buffer) = buffer.split_at(HEADER_LENGTH_LENGTH.into());
+    let header_len = u64::from_le_bytes(header_len.try_into().unwrap()) as usize;
+
+    let header = &buffer[..header_len];
+    let header =
+        rmp_serde::from_slice(header).expect("safetensors object should have valid header");
 
     Ok((header, header_len))
 }
@@ -384,6 +356,12 @@ pyo3::create_exception!(
     "Custom Python Exception for Dimble errors."
 );
 
+impl From<ir_to_dimble::Error> for PyErr {
+    fn from(value: ir_to_dimble::Error) -> Self {
+        DimbleError::new_err(snafu::Report::from_error(value).to_string())
+    }
+}
+
 #[pymodule]
 fn dimble_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(dicom_json_to_dimble))?;
@@ -398,6 +376,8 @@ fn dimble_rs(py: Python, m: &PyModule) -> PyResult<()> {
 mod tests {
     use super::*;
     use std::fs;
+
+    type Result<T = (), E = Box<dyn std::error::Error>> = std::result::Result<T, E>;
 
     #[test]
     fn test_load_pixel_array_safetensors() {
@@ -434,7 +414,7 @@ mod tests {
     }
 
     #[test]
-    fn test_integration_single_string() {
+    fn test_integration_single_string() -> Result {
         let dicom_json_text = r#"
         {
             "00080005": {
@@ -451,7 +431,7 @@ mod tests {
 
         fs::write(ir_path, dicom_json_text).expect("should be able to write to file");
 
-        dicom_json_to_dimble(ir_path, dimble_path, None);
+        dicom_json_to_dimble(ir_path, dimble_path, None)?;
 
         dimble_to_dicom_json(dimble_path, ir_recon_path);
 
@@ -461,10 +441,12 @@ mod tests {
             serde_json::from_reader(recon_json_reader).expect("should be able to read json");
         assert_eq!(recon_json["00080005"]["Value"][0], "ISO_IR 100");
         assert_eq!(recon_json["00080005"]["vr"], "CS");
+
+        Ok(())
     }
 
     #[test]
-    fn test_integration_string_array() {
+    fn test_integration_string_array() -> Result {
         let dicom_json_text = r#"
         {
             "00080008": {
@@ -483,7 +465,7 @@ mod tests {
 
         fs::write(ir_path, dicom_json_text).expect("should be able to write to file");
 
-        dicom_json_to_dimble(ir_path, dimble_path, None);
+        dicom_json_to_dimble(ir_path, dimble_path, None)?;
 
         dimble_to_dicom_json(dimble_path, ir_recon_path);
 
@@ -495,10 +477,12 @@ mod tests {
         assert_eq!(recon_json["00080008"]["Value"][1], "PRIMARY");
         assert_eq!(recon_json["00080008"]["Value"][2], "OTHER");
         assert_eq!(recon_json["00080008"]["vr"], "CS");
+
+        Ok(())
     }
 
     #[test]
-    fn test_integration_no_value() {
+    fn test_integration_no_value() -> Result {
         let dicom_json_text = r#"
         {
             "00080008": {
@@ -512,7 +496,7 @@ mod tests {
 
         fs::write(ir_path, dicom_json_text).expect("should be able to write to file");
 
-        dicom_json_to_dimble(ir_path, dimble_path, None);
+        dicom_json_to_dimble(ir_path, dimble_path, None)?;
 
         dimble_to_dicom_json(dimble_path, ir_recon_path);
 
@@ -522,10 +506,12 @@ mod tests {
             serde_json::from_reader(recon_json_reader).expect("should be able to read json");
         assert_eq!(recon_json["00080008"]["vr"], "PN");
         assert_eq!(recon_json["00080008"]["Value"], Value::Null);
+
+        Ok(())
     }
 
     #[test]
-    fn test_integration_inline_binary() {
+    fn test_integration_inline_binary() -> Result {
         let dicom_json_text = r#"
         {
             "00080008": {
@@ -540,7 +526,7 @@ mod tests {
 
         fs::write(ir_path, dicom_json_text).expect("should be able to write to file");
 
-        dicom_json_to_dimble(ir_path, dimble_path, None);
+        dicom_json_to_dimble(ir_path, dimble_path, None)?;
 
         dimble_to_dicom_json(dimble_path, ir_recon_path);
 
@@ -558,5 +544,7 @@ mod tests {
                 .contains_key("Value"),
             "should not have Value field"
         );
+
+        Ok(())
     }
 }
