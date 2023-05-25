@@ -17,7 +17,7 @@ pub enum DicomValue {
     Integer(Vec<i64>),
     Float(Vec<f64>),
     String(Vec<String>),
-    Alphabetic(Vec<Alphabetic>),
+    Alphabetic([Alphabetic; 1]),
     SeqField(Vec<DicomJsonData>),
 }
 

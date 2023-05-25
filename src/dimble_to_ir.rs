@@ -52,7 +52,7 @@ fn headerfield_and_bytes_to_dicom_fields(
                 }
                 b"PN" => {
                     let name = rmp_serde::decode::from_slice(field_bytes).unwrap();
-                    let a = DicomValue::Alphabetic(vec![Alphabetic { alphabetic: name }]);
+                    let a = DicomValue::Alphabetic([Alphabetic { alphabetic: name }]);
                     DicomField {
                         value: Some(a),
                         vr: *vr,

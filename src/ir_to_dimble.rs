@@ -31,7 +31,7 @@ fn get_file_bytes(safetensors_path: &str) -> Vec<u8> {
     fs::read(safetensors_path).unwrap()
 }
 
-fn dicom_values_to_vec(tag: &str, dicom_values: &DicomValue) -> Option<Vec<u8>> {
+fn dicom_values_to_vec(dicom_values: &DicomValue) -> Option<Vec<u8>> {
     let field_bytes = match dicom_values {
         DicomValue::String(v) => match &**v {
             [s] => to_vec(&s),
@@ -45,10 +45,7 @@ fn dicom_values_to_vec(tag: &str, dicom_values: &DicomValue) -> Option<Vec<u8>> 
             [u] => to_vec(&u),
             o => to_vec(o),
         },
-        DicomValue::Alphabetic(v) => match &**v {
-            [u] => to_vec(&u.alphabetic),
-            _ => panic!("{tag} can't have more than one Alphabetic"),
-        },
+        DicomValue::Alphabetic([u]) => to_vec(&u.alphabetic),
         DicomValue::SeqField(_) => {
             // TODO: handle sequences of sequences properly
             return None;
@@ -106,7 +103,7 @@ fn prepare_dimble_field(
                 }
                 dicom_values => {
                     // call a function to handle this
-                    match dicom_values_to_vec(tag, dicom_values) {
+                    match dicom_values_to_vec(dicom_values) {
                         Some(field_bytes) => {
                             Ok(extend_and_make_field(data_bytes, &field_bytes, *vr))
                         }
