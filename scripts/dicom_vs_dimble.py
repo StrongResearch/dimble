@@ -1,10 +1,11 @@
 # ruff: noqa: E501
+import json
 import time
 from pathlib import Path
 from typing import Optional
-import json
 
 import numpy as np
+import pandas as pd
 import plac
 import pydicom
 import torch
@@ -13,7 +14,9 @@ from tqdm import tqdm
 import dimble
 
 
-def dimble_loading(dimble_files, cuda=False, verbose=True) -> list[int]:
+def dimble_loading(
+    dimble_files, cuda=False, verbose=True
+) -> tuple[list[Path], list[int]]:
     times = []
     for file in tqdm(dimble_files, desc="DIMBLE", disable=not verbose):
         start_time = time.perf_counter()
@@ -26,7 +29,9 @@ def dimble_loading(dimble_files, cuda=False, verbose=True) -> list[int]:
     return times
 
 
-def dicom_loading(dicom_files, cuda=False, verbose=True) -> list[int]:
+def dicom_loading(
+    dicom_files, cuda=False, verbose=True
+) -> tuple[list[Path], list[int]]:
     times = []
     for file in tqdm(dicom_files, desc="DICOM", disable=not verbose):
         start_time = time.perf_counter()
@@ -39,20 +44,31 @@ def dicom_loading(dicom_files, cuda=False, verbose=True) -> list[int]:
         times.append(elapsed_time)
     return times
 
+
+def prepare_paths(mappings_file: Path, n: int) -> tuple[list[Path], list[Path]]:
+    df = pd.read_csv(mappings_file, header=None).iloc[:n]
+    dicom_paths = df[0].apply(lambda p: Path(p.strip())).to_list()
+    dimble_paths = df[1].apply(lambda p: Path(p.strip())).to_list()
+    return dicom_paths, dimble_paths
+
+
 @plac.annotations(
-    dicom_dir=("Path to DICOM directory", "positional", None, Path),
-    dimble_dir=("Path to DIMBLE directory", "positional", None, Path),
+    # dicom_dir=("Path to DICOM directory", "positional", None, Path),
+    # dimble_dir=("Path to DIMBLE directory", "positional", None, Path),
+    mappings_file=("Path to mappings file", "positional", None, Path),
     n=("Number of files to load", "option", "n", int),
     cuda=("Use CUDA", "flag", "c", bool),
 )
-def main(dicom_dir: Path, dimble_dir: Path, n: Optional[int], cuda: bool = False):
+def main(mappings_file: Path, n: Optional[int], cuda: bool = False):
+    # def main(dicom_dir: Path, dimble_dir: Path, n: Optional[int], cuda: bool = False):
     if n is None:
         n = -1
-    dicom_files = dimble.rglob_dicom(dicom_dir)[:n]
-    dimble_files = list(dimble_dir.rglob("*.dimble"))[:n]
-    assert len(dimble_files) == len(
-        dicom_files
-    ), "Number of files in DICOM and DIMBLE directories must match"
+    dicom_files, dimble_files = prepare_paths(mappings_file, n)
+    # dicom_files = dimble.rglob_dicom(dicom_dir)[:n]
+    # dimble_files = list(dimble_dir.rglob("*.dimble"))[:n]
+    # assert len(dimble_files) == len(
+    #     dicom_files
+    # ), "Number of files in DICOM and DIMBLE directories must match"
     print("Loading", len(dicom_files), "files")
 
     # warmup
@@ -84,13 +100,13 @@ def main(dicom_dir: Path, dimble_dir: Path, n: Optional[int], cuda: bool = False
     )
     print(f"DIMBLE is {dicom_elapsed/dimble_elapsed:.2f}x faster than DICOM")
 
-    with open("/tmp/dicom_vs_dimble_timings.json", 'w') as f:
+    with open("/tmp/dicom_vs_dimble_timings.json", "w") as f:
         json.dump(
             {
                 "dicom_times": dicom_times,
                 "dimble_times": dimble_times,
             },
-            f
+            f,
         )
 
 

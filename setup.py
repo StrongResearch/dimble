@@ -16,6 +16,7 @@ setup(
         "msgpack",
         "python-gdcm",
         "SimpleITK",
+        "pytest-benchmark",
     ],
     extras_require={"dev": ["black", "flake8", "isort", "pytest"]},
     tests_require=["pytest"],
