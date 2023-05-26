@@ -19,8 +19,11 @@ test: prep_test
 bench: prep_test
 	pytest --benchmark-enable --benchmark-group-by=fullfunc
 
-bench-pydicom-vs-sitk:
-	pytest test/pydicom_comparisons.py --benchmark-group-by=param -s --benchmark-save=pydicom_comparisons
+bench-dicom-baselines:
+	pytest test/dicom_baseline_comparisons.py --benchmark-group-by=param -s --benchmark-save=dicom_baselines_comparisons
+
+bench-nifti-baselines:
+	pytest test/nifti_baseline_comparisons.py --benchmark-group-by=param -s --benchmark-save=nifti_baselines_comparisons
 
 fmt:
 	cargo fmt

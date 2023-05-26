@@ -65,13 +65,13 @@ print("dimble_files", DIMBLE_FILES)
 def pydicom_to_numpy(dicom_file: Path):
     ds = pydicom.dcmread(dicom_file)
     pixel_array = ds.pixel_array
-    return pixel_array.sum()
+    return pixel_array
 
 
 def sitk_to_numpy(dicom_file: Path):
     ds = sitk.ReadImage(str(dicom_file))
     pixel_array = sitk.GetArrayFromImage(ds)
-    return pixel_array.sum()
+    return pixel_array
 
 
 def _get_gdcm_to_numpy_typemap():
@@ -129,7 +129,7 @@ def dimble_to_numpy(dicom_file: Path):
     dimble_file = DIMBLE_FILES[dicom_file]
     ds = dimble.load_dimble(str(dimble_file), fields=[PIXEL_ARRAY])
     pixel_array = ds[PIXEL_ARRAY]
-    return pixel_array.sum()
+    return pixel_array
 
 
 @pytest.mark.parametrize("dicom_file", dicom_files, ids=dicom_files_ids)
