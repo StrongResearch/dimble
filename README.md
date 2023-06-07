@@ -2,26 +2,22 @@
 
 Nimble Digital Imaging for Medicine
 
-Near lossless and easy conversion from DICOM and back
-- Done
+## Pipeline
 
-Support for fast and random access of metadata
-- Done
+### Completed
 
-Extremely fast and zero-copy loading to CPU/GPU
-- Done
+- [x] Near lossless and easy conversion from DICOM and back
+- [x] Support for fast and random access of metadata
+- [x] Extremely fast and zero-copy loading to CPU/GPU
+- [x] Safe: no codegen/exec based on the metadata
+- [x] Support for ITK file formats [[ref](https://simpleitk.readthedocs.io/en/v1.2.4/Documentation/docs/source/IO.html#images)], including NIfTI
 
+### WIP
 All relevant data types including uint16, f16, bf16, complex64 and complex128
 - Currently supports f32, trivial to support other datatypes
 
 Bindings for Python and conversion to NumPy/CuPy/JAX/Torch tensors
 - Currently supports loading to Torch tensors (easily extensible)
-
-Safe: no codegen/exec based on the metadata
-- Done
-
-Support for ITK file formats [[ref](https://simpleitk.readthedocs.io/en/v1.2.4/Documentation/docs/source/IO.html#images)], including NIfTI
-- Done
 
 
 ## Installation
