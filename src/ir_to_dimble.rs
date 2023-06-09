@@ -31,49 +31,25 @@ fn get_file_bytes(safetensors_path: &str) -> Vec<u8> {
     fs::read(safetensors_path).unwrap()
 }
 
-fn dicom_values_to_vec(tag: &str, dicom_values: &[DicomValue]) -> Option<Vec<u8>> {
+fn dicom_values_to_vec(dicom_values: &DicomValue) -> Option<Vec<u8>> {
     let field_bytes = match dicom_values {
-        [DicomValue::String(s)] => to_vec(&s),
-        [DicomValue::Integer(u)] => to_vec(&u),
-        [DicomValue::Float(u)] => to_vec(&u),
-        [DicomValue::Alphabetic(u)] => to_vec(&u.alphabetic),
-        many => match many
-            .first()
-            .expect("This should definitely have a first element")
-        {
-            DicomValue::String(_) => to_vec(
-                &many
-                    .iter()
-                    .map(|v| match v {
-                        DicomValue::String(s) => s.to_owned(),
-                        _ => panic!("{tag} expected only strings"),
-                    })
-                    .collect::<Vec<String>>(),
-            ),
-            DicomValue::Integer(_) => to_vec(
-                &many
-                    .iter()
-                    .map(|v| match v {
-                        DicomValue::Integer(i) => *i,
-                        _ => panic!("{tag} expected only ints"),
-                    })
-                    .collect::<Vec<i64>>(),
-            ),
-            DicomValue::Float(_) => to_vec(
-                &many
-                    .iter()
-                    .map(|v| match v {
-                        DicomValue::Float(f) => *f,
-                        _ => panic!("{tag} expected only floats"),
-                    })
-                    .collect::<Vec<f64>>(),
-            ),
-            DicomValue::SeqField(_) => {
-                // TODO: handle sequences of sequences properly
-                return None;
-            }
-            other => panic!("{tag} unexpected value type {:?}", other),
+        DicomValue::String(v) => match &**v {
+            [s] => to_vec(&s),
+            o => to_vec(o),
         },
+        DicomValue::Integer(v) => match &**v {
+            [u] => to_vec(&u),
+            o => to_vec(o),
+        },
+        DicomValue::Float(v) => match &**v {
+            [u] => to_vec(&u),
+            o => to_vec(o),
+        },
+        DicomValue::Alphabetic([u]) => to_vec(&u.alphabetic),
+        DicomValue::SeqField(_) => {
+            // TODO: handle sequences of sequences properly
+            return None;
+        }
     };
     let field_bytes = field_bytes.unwrap();
     Some(field_bytes)
@@ -107,17 +83,27 @@ fn prepare_dimble_field(
             vr,
             inline_binary: None,
         } => {
-            match value.as_slice() {
-                [] if vr == b"SQ" => Ok(HeaderField::SQ(vec![])),
-                [] => panic!("empty value"),
-                [DicomValue::SeqField(seq)] => {
-                    let sq_header_field_map =
-                        prepare_dimble_fields(seq, data_bytes, pixel_array_safetensors_path)?;
-                    Ok(HeaderField::SQ(vec![sq_header_field_map]))
+            if value.is_empty() {
+                if vr == b"SQ" {
+                    return Ok(HeaderField::SQ(vec![]));
+                }
+                panic!("empty value");
+            }
+
+            match value {
+                DicomValue::SeqField(seqs) => {
+                    let seqs = seqs
+                        .iter()
+                        .map(|seq| {
+                            prepare_dimble_fields(seq, data_bytes, pixel_array_safetensors_path)
+                        })
+                        .collect::<InnerResult<_, _>>()?;
+
+                    Ok(HeaderField::SQ(seqs))
                 }
                 dicom_values => {
                     // call a function to handle this
-                    match dicom_values_to_vec(tag, dicom_values) {
+                    match dicom_values_to_vec(dicom_values) {
                         Some(field_bytes) => {
                             Ok(extend_and_make_field(data_bytes, &field_bytes, *vr))
                         }
@@ -335,29 +321,23 @@ mod tests {
         {
             let field = ir.get("00080005").expect("expected 00080005 to exist");
             assert_eq!(field.vr, *b"CS");
-            let value: Vec<_> = field
+            let value = field
                 .value
-                .iter()
-                .map(|v| match v.as_slice() {
-                    [DicomValue::String(s)] => s,
-                    _ => panic!("expected only strings"),
-                })
-                .collect();
+                .as_ref()
+                .unwrap()
+                .to_string_ref()
+                .expect("expected only strings");
             assert_eq!(value, ["ISO_IR 100"])
         }
         {
             let field = ir.get("00080008").expect("expected 00080008 to exist");
             assert_eq!(field.vr, *b"CS");
-            let value: Vec<_> = field
+            let value = field
                 .value
                 .as_ref()
                 .unwrap()
-                .iter()
-                .map(|v| match v {
-                    DicomValue::String(s) => s,
-                    _ => panic!("expected only strings"),
-                })
-                .collect();
+                .to_string_ref()
+                .expect("expected only strings");
             assert_eq!(value, ["ORIGINAL", "PRIMARY", "OTHER"]);
         }
         {
@@ -368,17 +348,14 @@ mod tests {
         {
             let field = ir.get("00100010").expect("expected 00100010 to exist");
             assert_eq!(field.vr, *b"PN");
-            let value: Vec<_> = field
+            let value = field
                 .value
                 .as_ref()
                 .unwrap()
-                .iter()
-                .map(|v| match v {
-                    DicomValue::Alphabetic(a) => &a.alphabetic,
-                    _ => panic!("expected only alphabetic"),
-                })
-                .collect();
-            assert_eq!(value, ["Doe^John"])
+                .to_alphabetic_ref()
+                .expect("expected only alphabetic");
+            let value = value.iter().map(|x| &x.alphabetic).collect::<Vec<_>>();
+            assert_eq!(value, &["Doe^John"])
         }
 
         Ok(())

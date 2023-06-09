@@ -1,7 +1,7 @@
 use crate::dicom_json::*;
 use crate::ir_to_dimble::{HeaderField, HeaderFieldMap};
 use memmap2::MmapOptions;
-use rmpv::{decode, Integer, Value};
+use serde::Deserialize;
 use std::fs;
 
 fn headerfield_and_bytes_to_dicom_fields(
@@ -18,8 +18,10 @@ fn headerfield_and_bytes_to_dicom_fields(
         HeaderField::SQ(sqs) => {
             let seq_fields = sqs
                 .iter()
-                .map(|sq| DicomValue::SeqField(headers_to_data(sq, dimble_buffer)))
-                .collect::<Vec<_>>();
+                .map(|sq| headers_to_data(sq, dimble_buffer))
+                .collect();
+
+            let seq_fields = DicomValue::SeqField(seq_fields);
 
             DicomField {
                 value: Some(seq_fields),
@@ -50,31 +52,36 @@ fn headerfield_and_bytes_to_dicom_fields(
                 }
                 b"PN" => {
                     let name = rmp_serde::decode::from_slice(field_bytes).unwrap();
-                    let a = DicomValue::Alphabetic(Alphabetic { alphabetic: name });
+                    let a = DicomValue::Alphabetic([Alphabetic { alphabetic: name }]);
                     DicomField {
-                        value: Some(vec![a]),
+                        value: Some(a),
                         vr: *vr,
                         inline_binary: None,
                     }
                 }
                 _ => {
-                    let mut cursor = field_bytes;
-                    let v = decode::read_value(&mut cursor).unwrap();
-                    let value: Vec<_> = match v {
-                        Value::String(s) => vec![DicomValue::String(s.into_str().unwrap())],
-                        Value::Integer(i) => vec![integer_to_dicom_value(&i)],
-                        Value::F64(f) => vec![DicomValue::Float(f)],
-                        Value::Array(a) => a
-                            .into_iter()
-                            .map(|v| match v {
-                                Value::String(s) => DicomValue::String(s.into_str().unwrap()),
-                                Value::Integer(i) => integer_to_dicom_value(&i),
-                                Value::F64(f) => DicomValue::Float(f),
-                                _ => panic!("unexpected value type: {v:?}"),
-                            })
-                            .collect(),
-                        _ => panic!("unexpected value type: {v:?}"),
+                    #[derive(Debug, Deserialize)]
+                    #[serde(untagged)]
+                    enum MyValue {
+                        String(String),
+                        Strings(Vec<String>),
+                        Integer(i64), // We only support values that can be represented as i64
+                        Integers(Vec<i64>),
+                        F64(f64),
+                        F64s(Vec<f64>),
+                    }
+
+                    let v = rmp_serde::decode::from_slice(field_bytes).unwrap();
+
+                    let value = match v {
+                        MyValue::String(s) => DicomValue::String(vec![s]),
+                        MyValue::Strings(s) => DicomValue::String(s),
+                        MyValue::Integer(i) => DicomValue::Integer(vec![i]),
+                        MyValue::Integers(i) => DicomValue::Integer(i),
+                        MyValue::F64(f) => DicomValue::Float(vec![f]),
+                        MyValue::F64s(f) => DicomValue::Float(f),
                     };
+
                     DicomField {
                         value: Some(value),
                         vr: *vr,
@@ -94,16 +101,6 @@ fn headers_to_data(sq: &HeaderFieldMap, dimble_buffer: &[u8]) -> DicomJsonData {
             (tag, field)
         })
         .collect()
-}
-
-fn integer_to_dicom_value(i: &Integer) -> DicomValue {
-    if let Some(v) = i.as_i64() {
-        DicomValue::Integer(v)
-    } else if let Some(v) = i.as_u64() {
-        DicomValue::Integer(v as i64)
-    } else {
-        panic!("Could not represent the integer as i64 or u64")
-    }
 }
 
 pub fn dimble_to_dicom_json(dimble_path: &str, json_path: &str) {
